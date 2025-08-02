@@ -52,7 +52,7 @@ class SpreadsheetManager {
         const filePath = require('path').join(__dirname, '../envs/spreadsheets.env.json');
         fs.writeFileSync(filePath, JSON.stringify(this.spreadsheets, null, 4));
         this.spreadsheets = getSpreadsheets();
-        return true;
+        return `${category} spreadsheet updated successfully to https://docs.google.com/spreadsheets/d/${newSpreadsheetId}/edit. `;
     }
     async addKey(category, SpreadsheetId) {
         const check = await checkSpreadsheet(SpreadsheetId);

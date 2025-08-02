@@ -2,19 +2,22 @@ const express = require('express');
 const { loadSettings, resetDB } = require('./sheets');
 const router = express.Router();
 
-let accessSheets = require('./sheets').accessSheets
+const SpreadsheetManager = require('../utils/spreadsheets').SpreadsheetManager;
 
 // routes
 
-router.get('/test', (req, res) => {
-    res.json({ message: 'TNIV test route accessed!' });
-});
-router.get('/another-test', async (req, res) => {
+router.post('/reset', async (req, res) => {
     try {
-        res.json({ body: test });
+        if (!req.body || !req.body.focus) {
+            return res.status(400).json({ error: 'Invalid params' });
+        }
+        const spreadsheetManager = new SpreadsheetManager();
+        const id = spreadsheetManager.getSpreadsheet(req.body.focus);
+        const settings = await loadSettings(id);
+        const data = await resetDB(settings, id);
+        res.json({ body: data });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
-
 module.exports = router;

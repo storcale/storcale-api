@@ -100,7 +100,7 @@ async function loadSettings(spreadsheetId) {
     return settings;
 }
 
-async function getRosterData(settings,spreadsheetId) {
+async function getRosterData(settings, spreadsheetId) {
     const client = await auth.getClient();
     const sheets = google.sheets({ version: 'v4', auth: client });
 
@@ -147,7 +147,7 @@ async function getRosterData(settings,spreadsheetId) {
 
     return result;
 }
-async function resetDB(settings,spreadsheetId) {
+async function resetDB(settings, spreadsheetId) {
     const client = await auth.getClient();
     const sheets = google.sheets({ version: 'v4', auth: client });
     const range = `${settings.settingsSheetName}!${settings.dateField}`;
@@ -180,20 +180,49 @@ async function resetDB(settings,spreadsheetId) {
     today.setHours(0, 0, 0, 0);
     expiryDate.setHours(0, 0, 0, 0);
 
-    if (expiryDate <= today) {
-        console.log("Period has expired");
-    } else {
-        console.log("Still valid until", expiryDate.toDateString());
-    }
+    if (expiryDate >= today)
+        throw Error("Database can not be reset until", expiryDate.toDateString());
+    const users = await getUsers(settings, spreadsheetId);
+    
+    
+    await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${settings.settingsSheetName}!${settings.dateField}`,
+        valueInputOption: 'RAW',
+        requestBody: {
+            values: [[today.toLocaleDateString('en-US')]],
+        },
+    });
+
+    // Prepare a human-readable list of incomplete users and users with strikes
+    let output = "**Users with incomplete quota:**\n";
+    users.incomplete.forEach(user => {
+        output += `- ${user.username} (Points: ${user.points}, Strikes: ${user.strikes})\n`;
+    });
+
+    output += "\n**Users with Strikes:**\n";
+    users.strikes.forEach(user => {
+        output += `- ${user.username} (Points: ${user.points}, Strikes: ${user.strikes})\n`;
+    });
+    output += `\n\nDatabase reset successfully.`;
+    return output;
 }
 
-
-
-// Routes
-async function test() {
-        const data = await loadSettings("1-ZGSNVJc1YkGcvXr_Kq-NDljb19HUZaxwXMqYUruuCc");
-        return getRosterData(data);
-};
-
+async function getUsers(settings, spreadsheetId) {
+    try {
+        const roster = await getRosterData(settings, spreadsheetId);
+        const imcomplete = roster.filter(row => row[2] && row[2].toString().toLowerCase() === 'incomplete').map(row => ({ username: row[0], quotaStatus: row[2], points: row[1], strikes: row[3] }));
+        const strikes = roster.filter(row => {
+            const strikes = parseInt(row[3], 10);
+            return !isNaN(strikes) && strikes > 0;
+        }).map(row => ({ username: row[0], points: row[1], strikes: row[3] }));
+        return {
+            incomplete: imcomplete,
+            strikes: strikes,
+        };
+    } catch (err) {
+        throw new Error(`Failed to get users: ${err.message}`);
+    }
+}
 
 module.exports = { loadSettings, getRosterData, resetDB };
