@@ -6,7 +6,7 @@ const { SpreadsheetManager } = require('../../utils/spreadsheets');
 // routes
 /**
  * @swagger
- * /api/tniv/internal/addKey:
+ * /tniv/internal/addKey:
  *   post:
  *     summary: Add a spreadsheet key to a focus/category
  *     tags:
@@ -39,6 +39,10 @@ const { SpreadsheetManager } = require('../../utils/spreadsheets');
  *         description: Parameters invalid
  *       500:
  *         description: Server error
+ *       401:
+ *         description: No api-key provided
+ *       403:
+ *         description: Invalid api-key for ressource
  */
 router.post('/addKey', async (req, res) => {
     try {
@@ -54,7 +58,7 @@ router.post('/addKey', async (req, res) => {
 });
 /**
  * @swagger
- * /api/tniv/internal/removeKey:
+ * /tniv/internal/removeKey:
  *   delete:
  *     summary: Remove a spreadsheet key from a focus/category
  *     tags:
@@ -87,6 +91,10 @@ router.post('/addKey', async (req, res) => {
  *         description: Parameters invalid
  *       500:
  *         description: Server error
+ *       401:
+ *         description: No api-key provided
+ *       403:
+ *         description: Invalid api-key for ressource
  */
 router.delete('/removeKey', async (req, res) => {
     try {
@@ -102,7 +110,7 @@ router.delete('/removeKey', async (req, res) => {
 });
 /**
  * @swagger
- * /api/tniv/internal/updateKey:
+ * /tniv/internal/updateKey:
  *   patch:
  *     summary: Update a spreadsheet key for a focus/category
  *     tags:
@@ -135,6 +143,10 @@ router.delete('/removeKey', async (req, res) => {
  *         description: Parameters invalid
  *       500:
  *         description: Server error
+ *       401:
+ *         description: No api-key provided
+ *       403:
+ *         description: Invalid api-key for ressource
  */
 router.patch('/updateKey', async (req, res) => {
     try {

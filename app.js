@@ -54,9 +54,9 @@ try {
 function apiKeyMiddleware(category) {
     return (req, res, next) => {
         const key = req.get('api-key');
-        if (!key) return next(error(400, 'api key required'));
+        if (!key) return next(error(401, 'api key required'));
         const allowedKeys = apiKeyCategories[category.toLowerCase()] || [];
-        if (!allowedKeys.includes(key)) return next(error(401, 'invalid api key for ' + category));
+        if (!allowedKeys.includes(key)) return next(error(403, 'invalid api key for ' + category));
         req.key = key;
         next();
     };

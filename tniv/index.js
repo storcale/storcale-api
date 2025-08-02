@@ -6,9 +6,11 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api/tniv/reset:
+ * /tniv/reset:
  *   post:
  *     summary: This endpoint resets the specified focus' spreadsheet and updates user strikes accordingly.
+ *     security:
+ *      - apiKey: []
  *     tags:
  *       - TNIV
  *     requestBody:
@@ -38,6 +40,10 @@ const router = express.Router();
  *         description: Invalid params
  *       500:
  *         description: Server error
+ *       401:
+ *         description: No api-key provided
+ *       403:
+ *         description: Invalid api-key for ressource
  */
 router.post('/reset', async (req, res) => {
     try {
