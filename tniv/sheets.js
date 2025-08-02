@@ -1,5 +1,5 @@
+
 const { google } = require('googleapis');
-const { get } = require('http');
 
 const auth = new google.auth.GoogleAuth({
     keyFile: './envs/gsaKey.env.json',
@@ -156,50 +156,29 @@ async function loadSettings(spreadsheetId) {
     return settings;
 }
 
+function colLetterToIndex(col) {
+    if (typeof col === 'string') {
+        return col.toUpperCase().charCodeAt(0) - 65;
+    }
+    return col;
+}
+
 async function getRosterData(settings, spreadsheetId) {
     const client = await auth.getClient();
     const sheets = google.sheets({ version: 'v4', auth: client });
-
     const range = `${settings.rosterSheetName}!A3:Z`;
-
-    const res = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range,
-    });
-
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
     const data = res.data.values || [];
-    const result = [];
-
-    function colLetterToIndex(col) {
-        if (typeof col === 'string') {
-            return col.toUpperCase().charCodeAt(0) - 65;
-        }
-        return col;
-    }
-
-    const pointsCol = colLetterToIndex(settings.pointsColumn);
-    const strikeCol = colLetterToIndex(settings.strikeColumn);
-    const quotaStatusCol = colLetterToIndex(settings.quotaStatusColumn);
-
-    let rowIndex = 0;
-    while (rowIndex < data.length) {
-        const row = data[rowIndex];
+    return data.reduce((result, row, idx) => {
         const username = row[0];
-
-        if (!username) break;
-        if (username.toString().toLowerCase() === 'username') {
-            rowIndex++;
-            continue;
-        }
-
-        const points = row[pointsCol] || '';
-        const strikes = row[strikeCol] || '';
-        const quotaStatus = row[quotaStatusCol] || '';
-        const sheetRow = rowIndex + 3;
+        if (!username || username.toString().toLowerCase() === 'username') return result;
+        const points = row[colLetterToIndex(settings.pointsColumn)] || '';
+        const strikes = row[colLetterToIndex(settings.strikeColumn)] || '';
+        const quotaStatus = row[colLetterToIndex(settings.quotaStatusColumn)] || '';
+        const sheetRow = idx + 3;
         result.push({ username, points, quotaStatus, strikes, sheetRow });
-        rowIndex++;
-    }
-    return result;
+        return result;
+    }, []);
 }
 async function resetDB(settings, spreadsheetId) {
     const client = await auth.getClient();

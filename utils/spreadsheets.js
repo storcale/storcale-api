@@ -1,19 +1,15 @@
 const { google } = require('googleapis');
-const { get } = require('http');
-const spreadsheetFile = require('../envs/spreadsheets.env.json');
-const { file } = require('googleapis/build/src/apis/file');
 
 function getSpreadsheets() {
     const fs = require('fs');
     const filePath = require('path').join(__dirname, '../envs/spreadsheets.env.json');
-    let fileData = {};
     try {
-        fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
     } catch (e) {
         throw e;
     }
-    return fileData;
 }
+
 const auth = new google.auth.GoogleAuth({
     keyFile: './envs/gsaKey.env.json',
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
@@ -23,11 +19,10 @@ async function checkSpreadsheet(spreadsheetId) {
     try {
         const client = await auth.getClient();
         const sheets = google.sheets({ version: 'v4', auth: client });
-
-        const meta = await sheets.spreadsheets.get({ spreadsheetId });
-        return true
-    } catch (err) {
-        return false
+        await sheets.spreadsheets.get({ spreadsheetId });
+        return true;
+    } catch {
+        return false;
     }
 }
 
@@ -36,7 +31,8 @@ class SpreadsheetManager {
         this.spreadsheets = getSpreadsheets();
     }
     getSpreadsheet(category) {
-        if (!this.spreadsheets[category.toLowerCase()]) {
+        const key = category.toLowerCase();
+        if (!this.spreadsheets[key]) {
             throw new Error(`Category ${category} does not exist.`);
         }
         return this.spreadsheets[category.toLowerCase()];
