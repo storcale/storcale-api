@@ -26,8 +26,8 @@ jobs:
       - name: Install pnpm
         run: npm install -g pnpm
 
-      - name: Install dependencies
+      - name: Install dependencies using pnpm
         run: pnpm install
 
       - name: Run app
-        run: node api/app.js
+        run: node app.js
