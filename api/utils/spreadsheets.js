@@ -1,13 +1,18 @@
 const { google } = require('googleapis');
 const { get } = require('http');
 const spreadsheetFile = require('../envs/spreadsheets.env.json');
+const { file } = require('googleapis/build/src/apis/file');
 
 function getSpreadsheets() {
-    const spreadsheets = {};
-    for (const [category, keys] of Object.entries(spreadsheetFile)) {
-        spreadsheets[category.toLowerCase()] = keys;
+    const fs = require('fs');
+    const filePath = require('path').join(__dirname, '../envs/spreadsheets.env.json');
+    let fileData = {};
+    try {
+        fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch (e) {
+        throw e;
     }
-    return spreadsheets;
+    return fileData;
 }
 const auth = new google.auth.GoogleAuth({
     keyFile: './envs/gsaKey.env.json',
@@ -15,15 +20,14 @@ const auth = new google.auth.GoogleAuth({
 });
 
 async function checkSpreadsheet(spreadsheetId) {
-    try{
-    const client = await auth.getClient();
-    const sheets = google.sheets({ version: 'v4', auth: client });
+    try {
+        const client = await auth.getClient();
+        const sheets = google.sheets({ version: 'v4', auth: client });
 
-    const meta = await sheets.spreadsheets.get({ spreadsheetId });
-    return true
-    }catch (err) {
-        console.error('Error checking spreadsheet:', err);
-        return false;
+        const meta = await sheets.spreadsheets.get({ spreadsheetId });
+        return true
+    } catch (err) {
+        return false
     }
 }
 
@@ -32,32 +36,78 @@ class SpreadsheetManager {
         this.spreadsheets = getSpreadsheets();
     }
     getSpreadsheet(category) {
-    if (!this.spreadsheets[category.toLowerCase()]) {
-        throw new Error(`Category ${category} does not exist.`);
-    }
-    return this.spreadsheets[category.toLowerCase()];
+        if (!this.spreadsheets[category.toLowerCase()]) {
+            throw new Error(`Category ${category} does not exist.`);
+        }
+        return this.spreadsheets[category.toLowerCase()];
     }
 
-    updateSpreadsheet(category, newSpreadsheetId) {
-        if (!checkSpreadsheet(newSpreadsheetId)) {
+    async updateSpreadsheet(category, newSpreadsheetId) {
+        const check = await checkSpreadsheet(newSpreadsheetId);
+        if (!check) {
             throw new Error(`Spreadsheet ID ${newSpreadsheetId} is invalid or inaccessible. Make sure vanguards-api@vanguards-api.iam.gserviceaccount.com is added/The ID is correct.`);
         }
-        updateSpreadsheet(category, newSpreadsheetId);
+        this.spreadsheets[category.toLowerCase()] = newSpreadsheetId;
+        const fs = require('fs');
+        const filePath = require('path').join(__dirname, '../envs/spreadsheets.env.json');
+        fs.writeFileSync(filePath, JSON.stringify(this.spreadsheets, null, 4));
         this.spreadsheets = getSpreadsheets();
-        return true
+        return true;
     }
-    addKey(category, SpreadsheetId) {
-        if (!checkSpreadsheet(SpreadsheetId)) {
+    async addKey(category, SpreadsheetId) {
+        const check = await checkSpreadsheet(SpreadsheetId);
+        if (!check) {
             throw new Error(`Spreadsheet ID ${SpreadsheetId} is invalid or inaccessible. Make sure vanguards-api@vanguards-api.iam.gserviceaccount.com is added/The ID is correct.`);
         }
-        const spreadsheets = getSpreadsheets();
-        if (!spreadsheets[category.toLowerCase()]) {
-            spreadsheets[category.toLowerCase()] = [SpreadsheetId];
+        const fs = require('fs');
+        const filePath = require('path').join(__dirname, '../envs/spreadsheets.env.json');
+        let fileData = {};
+        try {
+            fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        } catch (e) {
+            throw e
         }
-        else {
-            throw new Error(`Category ${category} already exists.`);
+        const cat = category.toLowerCase();
+        if (!fileData[cat]) {
+            fileData[cat] = SpreadsheetId;
+        } else {
+            throw new Error(`Invalid data format for category ${category}.`);
         }
-        return true
+        fs.writeFileSync(filePath, JSON.stringify(fileData, null, 4));
+        this.spreadsheets = getSpreadsheets();
+        return true;
+    }
+    async removeKey(category, SpreadsheetId) {
+        const fs = require('fs');
+        const filePath = require('path').join(__dirname, '../envs/spreadsheets.env.json');
+        let fileData = {};
+        try {
+            fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        } catch (e) {
+            throw e;
+        }
+        const cat = category.toLowerCase();
+        if (!fileData[cat]) {
+            throw new Error(`Category ${category} does not exist.`);
+        }
+        if (fileData[cat] === SpreadsheetId) {
+            delete fileData[cat];
+        } else if (Array.isArray(fileData[cat])) {
+            // remove array
+            const idx = fileData[cat].indexOf(SpreadsheetId);
+            if (idx === -1) {
+                throw new Error(`Spreadsheet ID ${SpreadsheetId} does not exist in category ${category}.`);
+            }
+            fileData[cat].splice(idx, 1);
+            if (fileData[cat].length === 0) {
+                delete fileData[cat];
+            }
+        } else {
+            throw new Error(`Spreadsheet ID ${SpreadsheetId} does not exist in category ${category}.`);
+        }
+        fs.writeFileSync(filePath, JSON.stringify(fileData, null, 4));
+        this.spreadsheets = getSpreadsheets();
+        return true;
     }
 }
 
