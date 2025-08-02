@@ -10,13 +10,10 @@ async function loadSettings(spreadsheetId) {
     const client = await auth.getClient();
     const sheets = google.sheets({ version: 'v4', auth: client });
 
-    // Step 1: Get spreadsheet metadata to check if sheet exists
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
     const sheetExists = meta.data.sheets.some(sheet => sheet.properties.title === 'apiSettings');
 
-    // Step 2: If not, create and populate the sheet
     if (!sheetExists) {
-        // Create the sheet
         await sheets.spreadsheets.batchUpdate({
             spreadsheetId,
             requestBody: {
@@ -31,8 +28,6 @@ async function loadSettings(spreadsheetId) {
                 ],
             },
         });
-
-        // Set headers, labels, and sample data
         await sheets.spreadsheets.values.batchUpdate({
             spreadsheetId,
             requestBody: {
@@ -43,7 +38,7 @@ async function loadSettings(spreadsheetId) {
                         values: [['API Settings']],
                     },
                     {
-                        range: 'apiSettings!A2:A8',
+                        range: 'apiSettings!A2:A9',
                         values: [
                             ['Date field:'],
                             ['Roster sheet name:'],
@@ -52,6 +47,7 @@ async function loadSettings(spreadsheetId) {
                             ['Strike column:'],
                             ['Quota status column:'],
                             ['Settings sheet name:'],
+                            ['Quota to remove strike:']
                         ],
                     },
                     {
@@ -71,16 +67,75 @@ async function loadSettings(spreadsheetId) {
             },
         });
 
+        const metaAfter = await sheets.spreadsheets.get({ spreadsheetId });
+        const apiSettingsSheet = metaAfter.data.sheets.find(s => s.properties.title === 'apiSettings');
+        const sheetId = apiSettingsSheet.properties.sheetId;
+
+        await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: {
+                requests: [
+                    {
+                        repeatCell: {
+                            range: {
+                                sheetId: sheetId,
+                                startRowIndex: 0,
+                                endRowIndex: 1,
+                                startColumnIndex: 0,
+                                endColumnIndex: 3
+                            },
+                            cell: {
+                                userEnteredFormat: {
+                                    backgroundColor: { red: 1, green: 0.6, blue: 0 },
+                                    horizontalAlignment: 'LEFT',
+                                    textFormat: {
+                                        fontSize: 14,
+                                        bold: true,
+                                        foregroundColor: { red: 1, green: 1, blue: 1 }
+                                    }
+                                }
+                            },
+                            fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)'
+                        }
+                    },
+                    {
+                        repeatCell: {
+                            range: {
+                                sheetId: sheetId,
+                                startRowIndex: 1,
+                                endRowIndex: 9,
+                                startColumnIndex: 2,
+                                endColumnIndex: 3
+                            },
+                            cell: {
+                                userEnteredFormat: {
+                                    backgroundColor: { red: 0.8, green: 0.8, blue: 1 }
+                                }
+                            },
+                            fields: 'userEnteredFormat.backgroundColor'
+                        }
+                    },
+                    {
+                        updateSheetProperties: {
+                            properties: {
+                                sheetId: sheetId,
+                                hidden: true
+                            },
+                            fields: 'hidden'
+                        }
+                    }
+                ]
+            }
+        });
         throw new Error('Settings sheet created. Please fill in the required fields.');
     }
-    const settingsRange = 'apiSettings!C2:C8';
+    const settingsRange = 'apiSettings!C2:C9';
     const result = await sheets.spreadsheets.values.get({
         spreadsheetId,
         range: settingsRange,
     });
 
     const values = result.data.values?.map(row => row[0]) || [];
-
     const settings = {
         dateField: values[0],
         rosterSheetName: values[1],
@@ -89,6 +144,7 @@ async function loadSettings(spreadsheetId) {
         strikeColumn: values[4],
         quotaStatusColumn: values[5],
         settingsSheetName: values[6],
+        quotaToRemoveStrike: values[7],
     };
 
     for (const key in settings) {
@@ -137,14 +193,12 @@ async function getRosterData(settings, spreadsheetId) {
         }
 
         const points = row[pointsCol] || '';
-        const strike = row[strikeCol] || '';
+        const strikes = row[strikeCol] || '';
         const quotaStatus = row[quotaStatusCol] || '';
-
-        result.push([username, points, quotaStatus, strike]);
-
+        const sheetRow = rowIndex + 3;
+        result.push({ username, points, quotaStatus, strikes, sheetRow });
         rowIndex++;
     }
-
     return result;
 }
 async function resetDB(settings, spreadsheetId) {
@@ -181,10 +235,11 @@ async function resetDB(settings, spreadsheetId) {
     expiryDate.setHours(0, 0, 0, 0);
 
     if (expiryDate >= today)
-        throw Error("Database can not be reset until", expiryDate.toDateString());
-    const users = await getUsers(settings, spreadsheetId);
-    
-    
+        throw new Error("Database can not be reset until " + expiryDate.toDateString());
+    let pastUsers = await getUsers(settings, spreadsheetId);
+    let users, usersChanged;
+    [users, usersChanged] = await manageStrikes(pastUsers, settings, spreadsheetId);
+
     await sheets.spreadsheets.values.update({
         spreadsheetId,
         range: `${settings.settingsSheetName}!${settings.dateField}`,
@@ -194,35 +249,80 @@ async function resetDB(settings, spreadsheetId) {
         },
     });
 
-    // Prepare a human-readable list of incomplete users and users with strikes
     let output = "**Users with incomplete quota:**\n";
-    users.incomplete.forEach(user => {
-        output += `- ${user.username} (Points: ${user.points}, Strikes: ${user.strikes})\n`;
-    });
-
-    output += "\n**Users with Strikes:**\n";
-    users.strikes.forEach(user => {
-        output += `- ${user.username} (Points: ${user.points}, Strikes: ${user.strikes})\n`;
-    });
-    output += `\n\nDatabase reset successfully.`;
+    if (Array.isArray(users?.incomplete)) {
+        users.incomplete.forEach(user => {
+            output += `- ${user.username} (Points: ${user.points}, Strikes: ${user.strikes})\n`;
+        });
+    } else {
+        output += "N/A.\n";
+    }
+    output += "\n**Users with updated strikes:**\n";
+    if (Array.isArray(usersChanged)) {
+        usersChanged.forEach(user => {
+            output += `- ${user.username} was ${user.action} 1 strike (${user.beforeStrikes} -> ${user.afterStrikes}).\n`;
+        });
+    } else {
+        output += "N/A.\n";
+    }
     return output;
 }
 
 async function getUsers(settings, spreadsheetId) {
     try {
         const roster = await getRosterData(settings, spreadsheetId);
-        const imcomplete = roster.filter(row => row[2] && row[2].toString().toLowerCase() === 'incomplete').map(row => ({ username: row[0], quotaStatus: row[2], points: row[1], strikes: row[3] }));
-        const strikes = roster.filter(row => {
-            const strikes = parseInt(row[3], 10);
-            return !isNaN(strikes) && strikes > 0;
-        }).map(row => ({ username: row[0], points: row[1], strikes: row[3] }));
+        const imcomplete = roster.filter(row => row.quotaStatus && row.quotaStatus.toString().toLowerCase() === 'incomplete');
         return {
+            all: roster,
             incomplete: imcomplete,
-            strikes: strikes,
         };
     } catch (err) {
         throw new Error(`Failed to get users: ${err.message}`);
     }
 }
+async function manageStrikes(users, settings, spreadsheetId) {
+    const usersChanged = [];
+    const client = await auth.getClient();
+    const sheets = google.sheets({ version: 'v4', auth: client });
+    const roster = await getRosterData(settings, spreadsheetId);
 
+    for (let i = 0; i < users.incomplete.length; i++) {
+        const user = users.incomplete[i];
+        let strikes = parseInt(user.strikes, 10) || 0;
+        const rosterEntry = roster.find(row => row.username === user.username && row.quotaStatus && row.quotaStatus.toString().toLowerCase() === 'incomplete');
+        if (strikes < 3 && rosterEntry) {
+            await sheets.spreadsheets.values.update({
+                spreadsheetId,
+                range: `${settings.rosterSheetName}!${settings.strikeColumn}${rosterEntry.sheetRow}`,
+                valueInputOption: 'RAW',
+                requestBody: {
+                    values: [[strikes + 1]],
+                },
+            });
+            usersChanged.push({ username: user.username, beforeStrikes: strikes, afterStrikes: strikes + 1, action: "added" });
+            user.strikes = strikes + 1;
+        }
+    }
+
+    for (let i = 0; i < users.all.length; i++) {
+        const user = users.all[i];
+        let points = parseInt(user.points, 10) || 0;
+        let strikes = parseInt(user.strikes, 10) || 0;
+        let quotaToRemoveStrike = parseInt(settings.quotaToRemoveStrike, 10) || 0;
+        const rosterEntry = roster.find(row => row.username === user.username && (!row.quotaStatus || row.quotaStatus.toString().toLowerCase() !== 'incomplete'));
+        if (points >= quotaToRemoveStrike && strikes > 0 && rosterEntry) {
+            await sheets.spreadsheets.values.update({
+                spreadsheetId,
+                range: `${settings.rosterSheetName}!${settings.strikeColumn}${rosterEntry.sheetRow}`,
+                valueInputOption: 'RAW',
+                requestBody: {
+                    values: [[strikes - 1]],
+                },
+            });
+            usersChanged.push({ username: user.username, beforeStrikes: strikes, afterStrikes: strikes - 1, action: "removed" });
+            user.strikes = strikes - 1;
+        }
+    }
+    return [users, usersChanged];
+}
 module.exports = { loadSettings, getRosterData, resetDB };
