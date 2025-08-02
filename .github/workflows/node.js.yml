@@ -1,4 +1,4 @@
-name: Node.js CI
+name: Node.js CI with pnpm
 
 on:
   push:
@@ -15,17 +15,19 @@ jobs:
         node-version: [18.x, 20.x, 22.x]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install
 
       - name: Run app
         run: node api/app.js
