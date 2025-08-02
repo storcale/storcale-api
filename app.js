@@ -1,6 +1,3 @@
-
-
-
 const express = require('express');
 const app = module.exports = express();
 const fs = require('fs');
@@ -82,7 +79,7 @@ app.use((req, res, next) => {
 });
 // Admin endpoint
 
-app.get('/api/admin/logs', (req, res) => {
+app.get('/api/admin/logs', apiKeyMiddleware('ADMIN'), (req, res) => {
     let n = Math.max(1, Math.min(1000, parseInt(req.query.n, 10) || 100));
     fs.readFile(logFilePath, 'utf8', (err, data) => {
         if (err) return res.status(500).json({ error: 'Could not read log file' });
@@ -121,7 +118,7 @@ app.use((req, res) => {
 
 
 if (!module.parent) {
-    const port = process.env.PORT || 3000;
+    const port = process.env.PORT || 9902;
     app.listen(port, () => {
         console.log(`Express started on port ${port}`);
     });

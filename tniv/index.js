@@ -8,7 +8,7 @@ const router = express.Router();
  * @swagger
  * /api/tniv/reset:
  *   post:
- *     summary: Reset the TNIV spreadsheet and update user strikes
+ *     summary: This endpoint resets the specified focus' spreadsheet and updates user strikes accordingly.
  *     tags:
  *       - TNIV
  *     requestBody:
