@@ -79,23 +79,15 @@ app.use((req, res, next) => {
     next();
 });
 
-// Admin endpoint
-
-app.get('/api/admin/logs', apiKeyMiddleware('ADMIN'), (req, res) => {
-    let n = Math.max(1, Math.min(1000, parseInt(req.query.n, 10) || 100));
-    fs.readFile(logFilePath, 'utf8', (err, data) => {
-        if (err) return res.status(500).json({ error: 'Could not read log file' });
-        const lines = data.trim().split('\n');
-        res.json({ logs: lines.slice(-n) });
-    });
-});
 
 // Import routes
 const adminRoutes = require('./admin');
-app.use('/api/admin/dashboard', apiKeyMiddleware('ADMIN'), adminRoutes);
 app.get('/api/admin', (req, res) => {
     res.sendFile(path.join(__dirname, './admin/connect.html'));
 });
+app.use('/api/admin/', apiKeyMiddleware('ADMIN'), adminRoutes);
+app.use('/api/admin/dashboard', apiKeyMiddleware('ADMIN'), adminRoutes);
+
 
 const swaggerSpec = swaggerJSDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
