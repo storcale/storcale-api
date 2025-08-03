@@ -3,6 +3,13 @@ const path = require('path');
 const router = express.Router();
 const fs = require('fs');
 const logFilePath = path.join(__dirname, '../access.log');
+
+router.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '../admin/connect.html'));
+});
+router.get('/dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, '../admin/index.html'));
+});
 // /dashboard
 router.get('/logs', (req, res) => {
     let n = Math.max(1, Math.min(1000, parseInt(req.query.n, 10) || 100));
