@@ -53,7 +53,7 @@ try {
 
 function apiKeyMiddleware(category) {
     return (req, res, next) => {
-        const key = req.get('api-key');
+        const key = req.get('api-key') || req.query?.['api-key'];
         if (!key) return next(error(401, 'api key required'));
         const allowedKeys = apiKeyCategories[category.toLowerCase()] || [];
         if (!allowedKeys.includes(key)) return next(error(403, 'invalid api key for ' + category));
@@ -66,7 +66,8 @@ function apiKeyMiddleware(category) {
 const logFilePath = path.join(__dirname, 'access.log');
 app.use((req, res, next) => {
     if (req.originalUrl.startsWith('/api-docs/') || req.originalUrl === '/api-docs') return next();
-    const apiKey = req.get('api-key') || 'none';
+    if (!req.originalUrl.startsWith('/api/')) return next();
+    const apiKey = req.get('api-key') || req.query?.['api-key'] || 'none';
     const code = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const logLine = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - api-key: ${apiKey} - ${code}`;
     console.log(logLine);
@@ -77,6 +78,7 @@ app.use((req, res, next) => {
     }
     next();
 });
+
 // Admin endpoint
 
 app.get('/api/admin/logs', apiKeyMiddleware('ADMIN'), (req, res) => {
@@ -89,7 +91,14 @@ app.get('/api/admin/logs', apiKeyMiddleware('ADMIN'), (req, res) => {
 });
 
 // Import routes
+const adminRoutes = require('./admin');
+app.use('/api/admin/dashboard', apiKeyMiddleware('ADMIN'), adminRoutes);
+app.get('/api/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, './admin/connect.html'));
+});
 
+const swaggerSpec = swaggerJSDoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 const tnivRoutes = require('./tniv');
 const tnivInternalRoutes = require('./tniv/internal');
@@ -98,10 +107,6 @@ app.use('/api/tniv/internal', apiKeyMiddleware('TNIV'), tnivInternalRoutes);
 
 const lcfrRoutes = require('./lcfr');
 app.use('/api/lcfr', apiKeyMiddleware('LCFR'), lcfrRoutes);
-
-
-const swaggerSpec = swaggerJSDoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 
 

@@ -71,7 +71,7 @@ class SpreadsheetManager {
         }
         fs.writeFileSync(filePath, JSON.stringify(fileData, null, 4));
         this.spreadsheets = getSpreadsheets();
-        return true;
+        return `Sucessfully added https://docs.google.com/spreadsheets/d/${SpreadsheetId}/edit under ${category}!`;
     }
     async removeKey(category, SpreadsheetId) {
         const fs = require('fs');
@@ -103,7 +103,7 @@ class SpreadsheetManager {
         }
         fs.writeFileSync(filePath, JSON.stringify(fileData, null, 4));
         this.spreadsheets = getSpreadsheets();
-        return true;
+        return `Sucessfully removed ${category} from the database!`;
     }
 }
 

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Connect</title>
+</head>
+
+<body>
+    <input type="text" id="apiKeyInput" placeholder="Enter API Key" />
+    <button onclick="connect()">Connect</button>
+
+    <script>
+        function connect() {
+            const key = document.getElementById('apiKeyInput').value;
+            if (key !== "") {
+                window.location.href = `/api/admin/dashboard?api-key=${encodeURIComponent(key)}`;
+            } else {
+                alert('Input an API key');
+            }
+        }
+    </script>
+</body>
+
+</html>
