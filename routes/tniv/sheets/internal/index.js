@@ -1,16 +1,16 @@
 const express = require('express');
 const router = express.Router();
-
-const { SpreadsheetManager } = require('../../utils/spreadsheets');
+const path = require('path');
+const { SpreadsheetManager } = require(path.join(global.__basedir,'/utils/spreadsheets'));
 
 // routes
 /**
  * @swagger
- * /tniv/internal/addKey:
- *   post:
+ * /tniv/sheets/internal/addKey:
+ *   put:
  *     summary: Add a spreadsheet key to a focus/category
  *     tags:
- *       - TNIV Internal
+ *       - TNIV/Sheets
  *     requestBody:
  *       required: true
  *       content:
@@ -44,7 +44,7 @@ const { SpreadsheetManager } = require('../../utils/spreadsheets');
  *       403:
  *         description: Invalid api-key for ressource
  */
-router.post('/addKey', async (req, res) => {
+router.put('/addKey', async (req, res) => {
     try {
         if (!req.body || !req.body.focus || !req.body.spreadsheetId) {
             return res.status(400).json({ error: 'Parameters invalid' });
@@ -58,11 +58,11 @@ router.post('/addKey', async (req, res) => {
 });
 /**
  * @swagger
- * /tniv/internal/removeKey:
+ * /tniv/sheets/internal/removeKey:
  *   delete:
  *     summary: Remove a spreadsheet key from a focus/category
  *     tags:
- *       - TNIV Internal
+ *       - TNIV/Sheets
  *     requestBody:
  *       required: true
  *       content:
@@ -114,7 +114,7 @@ router.delete('/removeKey', async (req, res) => {
  *   patch:
  *     summary: Update a spreadsheet key for a focus/category
  *     tags:
- *       - TNIV Internal
+ *       - TNIV/Sheets
  *     requestBody:
  *       required: true
  *       content:

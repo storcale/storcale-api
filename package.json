@@ -12,6 +12,7 @@
   "packageManager": "pnpm@10.11.1",
   "dependencies": {
     "express": "^5.1.0",
+    "glob": "^11.0.3",
     "googleapis": "^154.1.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"

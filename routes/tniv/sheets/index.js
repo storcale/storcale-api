@@ -1,18 +1,18 @@
 const express = require('express');
-const { loadSettings, resetDB } = require('./sheets');
-const { SpreadsheetManager } = require('../utils/spreadsheets');
+const { loadSettings, resetDB } = require('./sheets.js');
+const path = require('path');
+const { SpreadsheetManager } = require(path.join(global.__basedir,'/utils/spreadsheets'));
 const router = express.Router();
-
 
 /**
  * @swagger
- * /tniv/reset:
+ * /tniv/sheets/reset:
  *   post:
  *     summary: This endpoint resets the specified focus' spreadsheet and updates user strikes accordingly.
  *     security:
  *      - apiKey: []
  *     tags:
- *       - TNIV
+ *       - TNIV/Sheets
  *     requestBody:
  *       required: true
  *       content:
