@@ -2,7 +2,10 @@ const express = require('express');
 const app = module.exports = express();
 const fs = require('fs');
 const path = require('path');
+const glob = require('glob');
+const loadRoutes = require('./utils/loadRoutes');
 app.use(express.json());
+global.__basedir = `${__dirname}`;
 
 // Swagger setup
 
@@ -22,45 +25,18 @@ const swaggerDefinition = {
         },
     ],
 };
-
-
+const apiFiles = glob.sync('routes/**/*.js');
 const swaggerOptions = {
     swaggerDefinition,
-    apis: ['./tniv/*.js', './lcfr/*.js', './tniv/internal/*.js'],
+    apis: apiFiles,
 };
-
-
-function error(status, msg) {
-    const err = new Error(msg);
-    err.status = status;
-    return err;
-}
+const swaggerSpec = swaggerJSDoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // get api keys
 
-const envPath = path.join(__dirname, '/envs/apikeys.env.json');
-let apiKeyCategories = {};
-try {
-    const envData = fs.readFileSync(envPath, 'utf8');
-    const envJson = JSON.parse(envData);
-    for (const [category, keysObj] of Object.entries(envJson)) {
-        apiKeyCategories[category.toLowerCase()] = Object.values(keysObj);
-    }
-} catch (e) {
-    console.error('Failed to load API keys from apikeys.env.json:', e);
-}
-
-
-function apiKeyMiddleware(category) {
-    return (req, res, next) => {
-        const key = req.get('api-key') || req.query?.['api-key'];
-        if (!key) return next(error(401, 'api key required'));
-        const allowedKeys = apiKeyCategories[category.toLowerCase()] || [];
-        if (!allowedKeys.includes(key)) return next(error(403, 'invalid api key for ' + category));
-        req.key = key;
-        next();
-    };
-}
+const apiKeyPath = path.join(__dirname, '/envs/apikeys.env.json');
+const apiKeysJson = JSON.parse(fs.readFileSync(apiKeyPath, 'utf8'));
 // Logger 
 
 const logFilePath = path.join(__dirname, 'access.log');
@@ -69,41 +45,23 @@ app.use((req, res, next) => {
     if (!req.originalUrl.startsWith('/api/')) return next();
     const apiKey = req.get('api-key') || req.query?.['api-key'] || 'none';
     const code = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    const logLine = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - api-key: ${apiKey} - ${code}`;
-    console.log(logLine);
-    try {
-        fs.appendFileSync(logFilePath, logLine + '\n');
-    } catch (err) {
-        console.error('Failed to write log:', err);
-    }
+    const body = req.body ? `- body: ${JSON.stringify(req.body)}` : '';
+    res.on('finish', () => {
+        const statusCode = res.statusCode;
+        const logLine = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - api-key: ${apiKey} ${body} - response: ${statusCode} - ${code}`;
+        console.log(logLine);
+        try {
+            fs.appendFileSync(logFilePath, logLine + '\n');
+        } catch (err) {
+            console.error('Failed to write log:', err);
+        }
+
+    });
     next();
 });
 
-
-// Import routes
-const adminRoutes = require('./admin');
-app.get('/api/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, './admin/connect.html'));
-});
-app.use('/api/admin/', apiKeyMiddleware('ADMIN'), adminRoutes);
-app.use('/api/admin/dashboard', apiKeyMiddleware('ADMIN'), adminRoutes);
-
-
-const swaggerSpec = swaggerJSDoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-const tnivRoutes = require('./tniv');
-const tnivInternalRoutes = require('./tniv/internal');
-app.use('/api/tniv', apiKeyMiddleware('TNIV'), tnivRoutes);
-app.use('/api/tniv/internal', apiKeyMiddleware('TNIV'), tnivInternalRoutes);
-
-const lcfrRoutes = require('./lcfr');
-app.use('/api/lcfr', apiKeyMiddleware('LCFR'), lcfrRoutes);
-
-
-
-// Utility
-
+// Automatically load routes
+loadRoutes(app, path.join(__dirname, 'routes'), apiKeysJson);
 
 app.use((err, req, res, next) => {
     res.status(err.status || 500).send({ error: err.message });

@@ -2,16 +2,9 @@ const express = require('express');
 const path = require('path');
 const router = express.Router();
 const fs = require('fs');
-const logFilePath = path.join(__dirname, '../access.log');
+const logFilePath = path.join(global.__basedir, '/access.log');
 
 router.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../admin/connect.html'));
-});
-router.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, '../admin/index.html'));
-});
-// /dashboard
-router.get('/logs', (req, res) => {
     let n = Math.max(1, Math.min(1000, parseInt(req.query.n, 10) || 100));
     fs.readFile(logFilePath, 'utf8', (err, data) => {
         if (err) return res.status(500).json({ error: 'Could not read log file' });
@@ -19,7 +12,7 @@ router.get('/logs', (req, res) => {
         res.json({ logs: lines.slice(-n) });
     });
 });
-router.delete('/logs', (req, res) => {
+router.delete('/', (req, res) => {
     fs.readFile(logFilePath, 'utf8', (err, data) => {
         if (err) return res.status(500).json({ error: 'Could not read log file' });
         fs.truncate(logFilePath, 0, (err) => {
@@ -28,5 +21,4 @@ router.delete('/logs', (req, res) => {
         });
     });
 });
-
 module.exports = router;

@@ -1,8 +1,8 @@
 const { google } = require('googleapis');
-
+const path = require('path');
 function getSpreadsheets() {
     const fs = require('fs');
-    const filePath = require('path').join(__dirname, '../envs/spreadsheets.env.json');
+    const filePath = path.join(global.__basedir, 'envs/spreadsheets.env.json');
     try {
         return JSON.parse(fs.readFileSync(filePath, 'utf8'));
     } catch (e) {
@@ -11,7 +11,7 @@ function getSpreadsheets() {
 }
 
 const auth = new google.auth.GoogleAuth({
-    keyFile: './envs/gsaKey.env.json',
+    keyFile: path.join(global.__basedir, 'envs/gsaKey.env.json'),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
@@ -21,8 +21,8 @@ async function checkSpreadsheet(spreadsheetId) {
         const sheets = google.sheets({ version: 'v4', auth: client });
         await sheets.spreadsheets.get({ spreadsheetId });
         return true;
-    } catch {
-        return false;
+    } catch (err) {
+        return err && err.message ? err.message : false;
     }
 }
 
@@ -40,23 +40,23 @@ class SpreadsheetManager {
 
     async updateSpreadsheet(category, newSpreadsheetId) {
         const check = await checkSpreadsheet(newSpreadsheetId);
-        if (!check) {
-            throw new Error(`Spreadsheet ID ${newSpreadsheetId} is invalid or inaccessible. Make sure vanguards-api@vanguards-api.iam.gserviceaccount.com is added/The ID is correct.`);
+        if (check !== true) {
+            throw new Error(`Spreadsheet ID ${newSpreadsheetId} is invalid or inaccessible. Reason: ${check}. Make sure vanguards-api@vanguards-api.iam.gserviceaccount.com is added/The ID is correct.`);
         }
         this.spreadsheets[category.toLowerCase()] = newSpreadsheetId;
         const fs = require('fs');
-        const filePath = require('path').join(__dirname, '../envs/spreadsheets.env.json');
+        const filePath = require('path').join(global.__basedir, 'envs/spreadsheets.env.json');
         fs.writeFileSync(filePath, JSON.stringify(this.spreadsheets, null, 4));
         this.spreadsheets = getSpreadsheets();
         return `${category} spreadsheet updated successfully to https://docs.google.com/spreadsheets/d/${newSpreadsheetId}/edit. `;
     }
     async addKey(category, SpreadsheetId) {
         const check = await checkSpreadsheet(SpreadsheetId);
-        if (!check) {
-            throw new Error(`Spreadsheet ID ${SpreadsheetId} is invalid or inaccessible. Make sure vanguards-api@vanguards-api.iam.gserviceaccount.com is added/The ID is correct.`);
+        if (check !== true) {
+            throw new Error(`Spreadsheet ID ${SpreadsheetId} is invalid or inaccessible. Reason: ${check}. Make sure vanguards-api@vanguards-api.iam.gserviceaccount.com is added/The ID is correct.`);
         }
         const fs = require('fs');
-        const filePath = require('path').join(__dirname, '../envs/spreadsheets.env.json');
+        const filePath = path.join(global.__basedir, 'envs/spreadsheets.env.json');
         let fileData = {};
         try {
             fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -75,7 +75,7 @@ class SpreadsheetManager {
     }
     async removeKey(category, SpreadsheetId) {
         const fs = require('fs');
-        const filePath = require('path').join(__dirname, '../envs/spreadsheets.env.json');
+        const filePath = path.join(global.__basedir, 'envs/spreadsheets.env.json');
         let fileData = {};
         try {
             fileData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
