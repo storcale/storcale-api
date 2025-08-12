@@ -33,7 +33,7 @@ router.get('/', (req, res) => {
                 .map(line => JSON.parse(line));
             return res.status(200).json(matches);
         });
-    }
+    }else{
     fs.readFile(logFilePath, 'utf8', (err, data) => {
         if (err) {
             console.error('Error reading log file:', err);
@@ -44,6 +44,7 @@ router.get('/', (req, res) => {
             .map(line => line ? JSON.parse(line) : null)
             .filter(match => match !== null);
         res.status(200).json(matches);
-    });
+
+    })};
 })
 module.exports = router;
