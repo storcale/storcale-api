@@ -20,10 +20,20 @@ const swaggerDefinition = {
         description: 'API documentation for Storcale',
     },
     servers: [
-        {
-            url: 'https://storcale-api.omegadev.xyz/api',
-        },
+        { url: 'https://storcale-api.omegadev.xyz/api' },
     ],
+    components: {
+        securitySchemes: {
+            ApiKeyAuth: {
+                type: 'apiKey',
+                in: 'header',
+                name: 'api-key'
+            }
+        }
+    },
+    security: [
+        { ApiKeyAuth: [] }
+    ]
 };
 const apiFiles = glob.sync('routes/**/*.js');
 const swaggerOptions = {

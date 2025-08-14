@@ -40,6 +40,14 @@ const router = express.Router();
  *         description: Invalid params
  *       500:
  *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Error message string
  *       401:
  *         description: No api-key provided
  *       403:

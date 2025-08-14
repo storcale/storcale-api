@@ -9,6 +9,8 @@ const { SpreadsheetManager } = require(path.join(global.__basedir,'/utils/spread
  * /tniv/sheets/internal/addKey:
  *   put:
  *     summary: Add a spreadsheet key to a focus/category
+ *     security:
+ *       - ApiKeyAuth: []
  *     tags:
  *       - TNIV/Sheets
  *     requestBody:
@@ -39,6 +41,14 @@ const { SpreadsheetManager } = require(path.join(global.__basedir,'/utils/spread
  *         description: Parameters invalid
  *       500:
  *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Error message string
  *       401:
  *         description: No api-key provided
  *       403:
@@ -61,6 +71,8 @@ router.put('/addKey', async (req, res) => {
  * /tniv/sheets/internal/removeKey:
  *   delete:
  *     summary: Remove a spreadsheet key from a focus/category
+ *     security:
+ *       - ApiKeyAuth: []
  *     tags:
  *       - TNIV/Sheets
  *     requestBody:
@@ -91,6 +103,14 @@ router.put('/addKey', async (req, res) => {
  *         description: Parameters invalid
  *       500:
  *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Error message string
  *       401:
  *         description: No api-key provided
  *       403:
@@ -110,9 +130,11 @@ router.delete('/removeKey', async (req, res) => {
 });
 /**
  * @swagger
- * /tniv/internal/updateKey:
+ * /tniv/sheets/internal/updateKey:
  *   patch:
  *     summary: Update a spreadsheet key for a focus/category
+*     security:
+ *       - ApiKeyAuth: []
  *     tags:
  *       - TNIV/Sheets
  *     requestBody:
@@ -143,6 +165,14 @@ router.delete('/removeKey', async (req, res) => {
  *         description: Parameters invalid
  *       500:
  *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Error message string
  *       401:
  *         description: No api-key provided
  *       403:
