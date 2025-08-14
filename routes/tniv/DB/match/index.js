@@ -3,16 +3,14 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const logFilePath = path.join(__dirname, 'matches.log');
-var axios = require('axios');
-
 
 /**
  * @swagger
  * /tniv/DB/match:
  *   post:
- *     summary: Post a new match.
+ *     summary: Log a match entry.
  *     security:
- *      - apiKey: []
+ *       - apiKey: []
  *     tags:
  *       - TNIV/DB
  *     requestBody:
@@ -21,13 +19,16 @@ var axios = require('axios');
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - sessionId
  *             properties:
- *               body:
- *                 type: json
- *                 description: Match data
+ *               sessionId:
+ *                 type: string
+ *                 description: Unique session identifier
+ *             additionalProperties: true
  *     responses:
  *       200:
- *         description: Match data logged and stored successfully
+ *         description: Match entry logged
  *         content:
  *           application/json:
  *             schema:
@@ -35,72 +36,66 @@ var axios = require('axios');
  *               properties:
  *                 body:
  *                   type: string
- *                   description: Logged!
+ *                   example: Logged!
  *       400:
- *         description: Invalid params
- *       500:
- *         description: Server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   description: Error message string
+ *         description: Invalid match data
  *       401:
  *         description: No api-key provided
  *       403:
- *         description: Invalid api-key for ressource
+ *         description: Invalid api-key for resource
+ *       500:
+ *         description: Server error
  */
 router.post('/', (req, res) => {
-    const matchData = req.body;
-    if (!matchData || !matchData.sessionId) {
-        return res.status(400).send({error:'Invalid match data'});
-    }
+  const matchData = req.body;
+  if (!matchData || !matchData.sessionId) {
+    return res.status(400).json({ error: 'Invalid match data' });
+  }
 
-    fs.appendFile(logFilePath, JSON.stringify(matchData) + '\n', (err) => {
-        if (err) {
-            console.error('Error writing to log file:', err);
-            return res.status(500).send({error:'Internal server error'});
-        }
-    });
-    res.status(200).send({body:"Logged!"});
+  fs.appendFile(logFilePath, JSON.stringify(matchData) + '\n', (err) => {
+    if (err) {
+      console.error('Error writing to log file:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+    return res.status(200).json({ body: 'Logged!' });
+  });
 });
 
 /**
  * @swagger
  * /tniv/DB/match:
  *   get:
- *     summary: Get all/specific match.
+ *     summary: Get all matches or filter by sessionId.
  *     security:
- *      - apiKey: []
+ *       - apiKey: []
  *     tags:
  *       - TNIV/DB
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               body:
- *                 type: string
- *                 description: Session ID to fetch
- *                 required: false
+ *     parameters:
+ *       - in: query
+ *         name: sessionId
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: If provided, returns only matches containing this sessionId
  *     responses:
  *       200:
- *         description: Match data sucessfully retrieved
+ *         description: Match data successfully retrieved
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
  *                 body:
- *                   type: object
- *                   description: Match data in json
+ *                   type: array
+ *                   description: Array of match records
+ *                   items:
+ *                     type: object
  *       400:
  *         description: Invalid params
+ *       401:
+ *         description: No api-key provided
+ *       403:
+ *         description: Invalid api-key for resource
  *       500:
  *         description: Server error
  *         content:
@@ -110,37 +105,37 @@ router.post('/', (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   description: Error message string
- *       401:
- *         description: No api-key provided
- *       403:
- *         description: Invalid api-key for ressource
+ *                   description: Error message
  */
 router.get('/', (req, res) => {
-    const sessionId = req.query.sessionId;
-    if (!sessionId) {
-        fs.readFile(logFilePath, 'utf8', (err, data) => {
-            if (err) {
-                console.error('Error reading log file:', err);
-                return res.status(500).send({error:'Internal server error'});
-            }
-            const matches = data.split('\n')
-                .filter(line => line.trim() !== '')
-                .map(line => JSON.parse(line));
-            return res.status(200).send({body:json(matches)})
-        });
-    }else{
-    fs.readFile(logFilePath, 'utf8', (err, data) => {
-        if (err) {
-            console.error('Error reading log file:', err);
-            return res.status(500).send({error:'Internal server error'});
-        }
-        const matches = data.split('\n')
-            .filter(line => line.includes(sessionId))
-            .map(line => line ? JSON.parse(line) : null)
-            .filter(match => match !== null);
-        res.status(200).send({body:json(matches)})
+  const sessionId = req.query.sessionId;
 
-    })};
-})
+  fs.readFile(logFilePath, 'utf8', (err, data = '') => {
+    if (err) {
+      if (err.code === 'ENOENT') {
+        // file not created yet -> empty list
+        return res.status(200).json({ body: [] });
+      }
+      console.error('Error reading log file:', err);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+
+    const lines = data
+      .split('\n')
+      .filter((line) => line.trim() !== '');
+
+    const filtered = sessionId
+      ? lines.filter((line) => line.includes(sessionId))
+      : lines;
+
+    const matches = filtered
+      .map((line) => {
+        try { return JSON.parse(line); } catch { return null; }
+      })
+      .filter((x) => x !== null);
+
+    return res.status(200).json({ body: matches });
+  });
+});
+
 module.exports = router;
