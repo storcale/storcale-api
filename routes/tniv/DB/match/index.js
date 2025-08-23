@@ -123,8 +123,8 @@ router.get('/', (req, res) => {
     const lines = data
       .split('\n')
       .filter((line) => line.trim() !== '');
-
-    const filtered = sessionId
+    if(sessionId){
+      const filtered = sessionId
       ? lines.filter((line) => line.includes(sessionId))
       : lines;
 
@@ -133,7 +133,13 @@ router.get('/', (req, res) => {
         try { return JSON.parse(line); } catch { return null; }
       })
       .filter((x) => x !== null);
-
+    }else{
+      const matches = lines
+      .map((line) => {
+        try { return JSON.parse(line); } catch { return null; }
+      })
+      .filter((x) => x !== null);
+    }
     return res.status(200).json({ body: matches });
   });
 });

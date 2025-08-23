@@ -4,23 +4,26 @@ const path = require('path');
 
 function getPermsForPath(apiKeysJson, endpointPath) {
     const perms = {};
+    const allKeys = [];
     for (const [category, entry] of Object.entries(apiKeysJson)) {
         if (category === 'perms' || category === 'publicDirs') continue;
         const key = entry.key;
         const keyPerms = (entry.perm || '').split(',').map(p => p.trim());
-
+        
         keyPerms.forEach(p => {
             perms[p] = perms[p] || [];
             perms[p].push(key);
         });
 
         if (keyPerms.includes('all')) {
-            perms['all'] = perms['all'] || [];
-            perms['all'].push(key);
+            allKeys.push(key);
         }
+        // console.log(`API Key for category ${category}: ${key} with perms: ${keyPerms}`);
     }
 
-    return perms[endpointPath] || perms['all'] || [];
+    // Always include 'all' keys for every endpoint
+    const endpointKeys = perms[endpointPath] || [];
+    return Array.from(new Set([...endpointKeys, ...allKeys]));
 }
 
 function apiKeyMiddleware(allowedKeys) {
@@ -57,6 +60,7 @@ function loadRoutes(app, routesDir, apiKeysJson, baseUrl = '/api') {
                 } else {
                     const allowedKeys = getPermsForPath(apiKeysJson, endpointPath);
                     const middleware = apiKeyMiddleware(allowedKeys);
+                    // console.log(`Allowed keys for ${endpointPath}:`, allowedKeys);
                     app.use(`${baseUrl}/${endpointPath}`, middleware, router);
                     console.log(`Mounted PROTECTED route: ${baseUrl}/${endpointPath}`);
                 }
