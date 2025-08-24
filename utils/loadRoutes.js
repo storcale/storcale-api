@@ -5,9 +5,10 @@ const path = require('path');
 function getPermsForPath(apiKeysJson, endpointPath) {
     const perms = {};
     const allKeys = [];
-    for (const [category, entry] of Object.entries(apiKeysJson)) {
-        if (category === 'perms' || category === 'publicDirs') continue;
-        const key = entry.key;
+        for (const [category, entry] of Object.entries(apiKeysJson)) {
+            if (category === 'perms' || category === 'publicDirs') continue;
+            if (!entry.valid) continue; 
+            const key = entry.key;
         const keyPerms = (entry.perm || '').split(',').map(p => p.trim());
         
         keyPerms.forEach(p => {
@@ -21,12 +22,12 @@ function getPermsForPath(apiKeysJson, endpointPath) {
         // console.log(`API Key for category ${category}: ${key} with perms: ${keyPerms}`);
     }
 
-    // Always include 'all' keys for every endpoint
     const endpointKeys = perms[endpointPath] || [];
     return Array.from(new Set([...endpointKeys, ...allKeys]));
 }
 
 function apiKeyMiddleware(allowedKeys) {
+    // Find the apiKeysJson in closure
     return (req, res, next) => {
         const key = req.get('api-key') || req.query?.['api-key'];
         if (!key) return res.status(401).json({ error: 'API key required' });
