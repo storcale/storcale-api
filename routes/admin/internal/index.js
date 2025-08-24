@@ -1,3 +1,9 @@
+const express = require('express');
+const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const { exec } = require('child_process');
+
 function reload() {
     const scriptPath = path.join(global.__basedir, '/reload.sh');
     return new Promise((resolve, reject) => {
@@ -48,6 +54,7 @@ router.post('/deactivate', async (req, res) => {
 
     res.json({ body: `API key ${apiKey} deactivated, reloading....` });
 
-    // Run reload in background
     reload().catch(err => console.error("Reload failed:", err));
 });
+
+module.exports = router;
