@@ -1,4 +1,4 @@
-require('dotenv').config()
+require('dotenv').config({ quiet: true });
 const express = require('express');
 const app = module.exports = express();
 const fs = require('fs');
@@ -7,6 +7,13 @@ const glob = require('glob');
 const loadRoutes = require('./utils/loadRoutes');
 app.use(express.json());
 global.__basedir = `${__dirname}`;
+
+try {
+  require('dotenv').config();
+  console.log('dotenv loaded');
+} catch (error) {
+  console.error('Error loading .env:', error);
+}
 
 // Swagger setup
 
