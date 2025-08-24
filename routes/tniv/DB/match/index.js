@@ -51,7 +51,6 @@ router.post('/', (req, res) => {
   if (!matchData || !matchData.sessionId) {
     return res.status(400).json({ error: 'Invalid match data' });
   }
-
   fs.appendFile(logFilePath, JSON.stringify(matchData) + '\n', (err) => {
     if (err) {
       console.error('Error writing to log file:', err);
