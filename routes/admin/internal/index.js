@@ -10,12 +10,13 @@ function reload(){
         if (error) {
             return res.status(500).json({ error: error.message });
         }
-        res.json({ body: stdout || 'Reload/Deploy script executed.' });
+        return({ body: stdout || 'Reload/Deploy script executed.' });
     });
 }
 // POST /deploy: run deploy.sh
 router.post('/reload', (req, res) => {
     reload()
+    res.json({ body: `Reloaded!` });
 });
 
 // POST /deactivate?key=...: set valid=false for API key
