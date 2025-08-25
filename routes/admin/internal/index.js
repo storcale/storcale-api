@@ -17,16 +17,17 @@ function reload() {
 // POST /reload
 router.post('/reload', async (req, res) => {
     try {
+        res.json({ body: "Reloading!" });
         const output = await reload();
-        res.json({ body: output });
+        
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
 // POST /deactivate
-router.post('/deactivate', async (req, res) => {
-    const apiKey = req.query.key;
+router.put('/deactivate', async (req, res) => {
+    const apiKey = req.body.key;
     if (!apiKey) return res.status(400).json({ error: 'Missing key query param.' });
 
     const apikeysPath = path.join(global.__basedir, '/envs/apikeys.env.json');

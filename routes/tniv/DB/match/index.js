@@ -140,7 +140,7 @@ router.get('/', (req, res) => {
       .filter((x) => x !== null);
     }
     const filterMatches = matches || []
-    return res.status(200).json({ body: matches });
+    return res.status(200).json({ body: filterMatches });
   });
 });
 
