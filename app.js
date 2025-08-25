@@ -1,4 +1,4 @@
-require('dotenv').config({ quiet: true });
+require('dotenv').config({ path: path.join(__dirname, 'envs/.env') });
 const express = require('express');
 const app = module.exports = express();
 const fs = require('fs');
@@ -9,10 +9,10 @@ app.use(express.json());
 global.__basedir = `${__dirname}`;
 
 try {
-  require('dotenv').config();
-  console.log('dotenv loaded');
+    require('dotenv').config();
+    console.log('dotenv loaded');
 } catch (error) {
-  console.error('Error loading .env:', error);
+    console.error('Error loading .env:', error);
 }
 
 // Swagger setup

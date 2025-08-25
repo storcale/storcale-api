@@ -66,12 +66,10 @@ router.post('/', async (req, res) => {
         if (!payload.content && !payload.embeds) {
             return res.status(400).json({ error: 'Payload must have content or embeds.' });
         }
-        console.log("Forwarding webhook to", TARGET_WEBHOOK_URL);
         await axios.post(TARGET_WEBHOOK_URL, payload);
         lastWebhookContent = JSON.stringify(body);
         return res.status(200).json({ body: 'Webhook forwarded.' });
     } catch (err) {
-        console.error('Discord webhook error:', err?.response?.data || err?.message || err);
         return res.status(500).json({ error: 'Failed to forward webhook.', details: err?.response?.data || err?.message || err });
     }
 });
