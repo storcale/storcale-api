@@ -1,4 +1,4 @@
-require('dotenv').config({ path: path.join(__dirname, 'envs/.env') });
+
 const express = require('express');
 const app = module.exports = express();
 const fs = require('fs');
@@ -9,7 +9,7 @@ app.use(express.json());
 global.__basedir = `${__dirname}`;
 
 try {
-    require('dotenv').config();
+    require('dotenv').config({ path: path.join(__dirname, 'envs/.env') });
     console.log('dotenv loaded');
 } catch (error) {
     console.error('Error loading .env:', error);
