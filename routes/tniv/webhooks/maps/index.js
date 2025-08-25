@@ -8,9 +8,24 @@ router.post('/', async (req, res) => {
     const whitelisted = false
     const body = req.body;
     if (!body) return res.status(400).json({ error: 'Invalid webhook payload' });
-    const content = body.content || '';
     if (body.files || body.attachments || (Array.isArray(body.embeds) && body.embeds.some(e => e.files || e.attachments))) {
         return res.status(403).json({ error: 'Webhook denied: files/attachments not allowed.' });
+    }
+    function cleanPayload(payload) {
+        const cleaned = {};
+        if (typeof payload.content === 'string' && payload.content.length > 0) {
+            cleaned.content = payload.content;
+        }
+        if (Array.isArray(payload.embeds)) {
+            const validEmbeds = payload.embeds.filter(e => e && typeof e === 'object');
+            if (validEmbeds.length > 0) {
+                cleaned.embeds = validEmbeds;
+            }
+        }
+        if (payload.flags !== undefined) {
+            cleaned.flags = payload.flags;
+        }
+        return cleaned;
     }
     let hasVanguard = false;
 
@@ -35,6 +50,7 @@ router.post('/', async (req, res) => {
         return false;
     }
     const hasPing = containsPing(body);
+    const content = body.content || '';
     if (content.includes('The Vanguard Development Team')) {
         hasVanguard = true;
     } else if (Array.isArray(body.embeds)) {
@@ -45,7 +61,11 @@ router.post('/', async (req, res) => {
         return res.status(403).json({ error: 'Webhook denied.' });
     }
     try {
-        if(!whitelisted){const payload = { ...body, flags: 4096 }}else{const payload = {body}}
+        let payload = cleanPayload(body);
+        if(!whitelisted){payload.flags = 4096;}
+        if (!payload.content && !payload.embeds) {
+            return res.status(400).json({ error: 'Payload must have content or embeds.' });
+        }
         console.log("Forwarding webhook to", TARGET_WEBHOOK_URL);
         await axios.post(TARGET_WEBHOOK_URL, payload);
         lastWebhookContent = JSON.stringify(body);
