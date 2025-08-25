@@ -1,3 +1,4 @@
+set -e
 echo "[Deploy]"
 git pull
 bun install

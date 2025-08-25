@@ -5,6 +5,7 @@ let lastWebhookContent = null;
 const TARGET_WEBHOOK_URL = process.env.WEBHOOK_URL || "null";
 
 router.post('/', async (req, res) => {
+    const whitelisted = false
     const body = req.body;
     if (!body) return res.status(400).json({ error: 'Invalid webhook payload' });
     const content = body.content || '';
@@ -12,9 +13,21 @@ router.post('/', async (req, res) => {
         return res.status(403).json({ error: 'Webhook denied: files/attachments not allowed.' });
     }
     let hasVanguard = false;
+
     function containsPing(obj) {
-        const pingRegex = /<@\d+>|<@&\d+>|@everyone|@here/;
-        if (typeof obj === 'string') return pingRegex.test(obj);
+        const pingRegex = /<@([&]?)(\d+)>|@everyone|@here/;
+        if (typeof obj === 'string') {
+            let match;
+            let str = obj;
+            while ((match = pingRegex.exec(str)) !== null) {
+                if (match[0] === '@everyone' || match[0] === '@here') return true;
+                const id = match[2];
+                if (!process.env.WHITELISTED_IDS.includes(id)) return true;
+                str = str.slice(match.index + match[0].length);
+                whitelised = true
+            }
+            return false;
+        }
         if (Array.isArray(obj)) return obj.some(containsPing);
         if (obj && typeof obj === 'object') {
             return Object.values(obj).some(containsPing);
@@ -32,12 +45,14 @@ router.post('/', async (req, res) => {
         return res.status(403).json({ error: 'Webhook denied.' });
     }
     try {
+        if(!whitelisted){const payload = { ...body, flags: 4096 }}else{const payload = {body}}
         console.log("Forwarding webhook to", TARGET_WEBHOOK_URL);
-        await axios.post(TARGET_WEBHOOK_URL, body);
+        await axios.post(TARGET_WEBHOOK_URL, payload);
         lastWebhookContent = JSON.stringify(body);
         return res.status(200).json({ body: 'Webhook forwarded.' });
     } catch (err) {
-        return res.status(500).json({ error: 'Failed to forward webhook.' });
+        console.error('Discord webhook error:', err?.response?.data || err?.message || err);
+        return res.status(500).json({ error: 'Failed to forward webhook.', details: err?.response?.data || err?.message || err });
     }
 });
 
