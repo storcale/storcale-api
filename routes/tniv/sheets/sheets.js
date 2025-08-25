@@ -214,7 +214,7 @@ async function resetDB(settings, spreadsheetId) {
     today.setHours(0, 0, 0, 0);
     expiryDate.setHours(0, 0, 0, 0);
 
-    if (expiryDate >= today)
+    if (expiryDate > today)
         throw new Error("Database can not be reset until " + expiryDate.toDateString());
     let pastUsers = await getUsers(settings, spreadsheetId);
     let users, usersChanged;
