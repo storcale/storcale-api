@@ -55,7 +55,7 @@ async function notifyDeniedWebhook(hasPing, hasVanguard, isDuplicate, info) {
                 "headers": {
                     "api-key": apiKey
                 },
-                "body": `{"key": "${apiKey}"}`
+                "body": `{"key": "${senderKey}"}`
             }
         ];
         const click = `${url}/api/admin/dashboard?api-key=${apiKey}`;
