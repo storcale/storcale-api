@@ -29,20 +29,20 @@ async function notify(title, message, priority, actions, click, email) {
 }
 
 let lastSender = null;
-async function notifyDeniedWebhook(hasPing, hasVanguard, isDuplicate, apiKeyReceived) {
+async function notifyDeniedWebhook(hasPing, hasVanguard, isDuplicate, info) {
     try {
-        console.log("lol")
-        if(apiKeyReceived && lastSender === apiKeyReceived){
-            return false
+        const senderKey = info?.apiKey || 'unknown';
+        if (lastSender === senderKey) {
+            return false;
         }
-        lastSender = apiKeyReceived;
+        lastSender = senderKey;
         const url = "https://storcale-api.omegadev.xyz";
         let reasons = [];
         if (hasPing) reasons.push("ping included");
         if (!hasVanguard) reasons.push("did not provide passkey");
         if (isDuplicate) reasons.push("is a duplicate");
         if (reasons.length === 0) reasons.push("unknown reason");
-        const message = `Webhook denied for: ${reasons.join(", ")}. Sender: ${apiKeyReceived || "unknown"}`;
+        const message = `Webhook denied for: ${reasons.join(", ")}. Info on sender: ${info.apiKey || "unknown"} ${info.code || "unknown"} ${info.body || "unknown"}`;
         const title = "TNIV API | Webhook flagged as dangerous";
         const priority = 4;
         const apiKey = process.env.ADMIN_KEY || "";
@@ -55,15 +55,16 @@ async function notifyDeniedWebhook(hasPing, hasVanguard, isDuplicate, apiKeyRece
                 "headers": {
                     "api-key": apiKey
                 },
-                "body": `{"key": "${apiKeyReceived}"}`
+                "body": `{"key": "${apiKey}"}`
             }
         ];
         const click = `${url}/api/admin/dashboard?api-key=${apiKey}`;
         const email = process.env.EMAIL || "";
         const response = await notify(title, message, priority, actions, click, email);
-        return response
-    }catch(e){
-        return e
+        return response;
+    } catch(e) {
+        console.error("notifyDeniedWebhook error:", e);
+        return e;
     }
 }
 

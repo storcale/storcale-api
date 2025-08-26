@@ -6,7 +6,11 @@ let lastWebhookContent = null;
 const TARGET_WEBHOOK_URL = process.env.WEBHOOK_URL || "null";
 const { notifyDeniedWebhook } = require(path.join(global.__basedir, "utils/notify.js"))
 router.post('/', async (req, res) => {
-    const apiKey = req.get('api-key') || req.query?.['api-key'] || 'none';
+    const info = {
+        apiKey: req.get('api-key') || req.query?.['api-key'] || 'none',
+        code: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+        body: req.body ? `- body: ${JSON.stringify(req.body)}` : ''
+    }
     const whitelisted = false
     const body = req.body;
     if (!body) return res.status(400).json({ error: 'Invalid webhook payload' });
@@ -61,8 +65,8 @@ router.post('/', async (req, res) => {
     }
     const isDuplicate = lastWebhookContent === JSON.stringify(body);
     if (hasPing || !hasVanguard || isDuplicate) {
-        if(isDuplicate) {
-            const notify = notifyDeniedWebhook(hasPing, hasVanguard, isDuplicate, apiKey)
+        if (isDuplicate) {
+            const notify = notifyDeniedWebhook(hasPing, hasVanguard, isDuplicate, info)
         }
         lastWebhookContent = JSON.stringify(body);
         return res.status(403).json({ error: 'Webhook denied.' });

@@ -1,5 +1,6 @@
 set -e
 echo "[DEPLOY]"
+git stash
 git pull
 bun install
 
@@ -9,3 +10,4 @@ nohup node app.js >/dev/null 2>&1 &
 
 NEW_PID=$!
 echo "[RELOAD] API started with PID $NEW_PID"
+# chmod +x reload.sh
