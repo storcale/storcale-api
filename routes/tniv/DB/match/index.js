@@ -122,11 +122,12 @@ router.get('/', (req, res) => {
     const lines = data
       .split('\n')
       .filter((line) => line.trim() !== '');
+      
+    const matches = lines || []
     if(sessionId){
       const filtered = sessionId
       ? lines.filter((line) => line.includes(sessionId))
       : lines;
-
     const matches = filtered
       .map((line) => {
         try { return JSON.parse(line); } catch { return null; }

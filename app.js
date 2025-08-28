@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const glob = require('glob');
 const loadRoutes = require('./utils/loadRoutes');
+const querystring = require('node:querystring'); 
 app.use(express.json());
 global.__basedir = `${__dirname}`;
 
@@ -64,9 +65,10 @@ app.use((req, res, next) => {
     const apiKey = req.get('api-key') || req.query?.['api-key'] || 'none';
     const code = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const body = req.body ? `- body: ${JSON.stringify(req.body)}` : '';
+    const query = querystring.stringify(req.query) || "No Query"
     res.on('finish', () => {
         const statusCode = res.statusCode;
-        const logLine = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - api-key: ${apiKey} ${body} - response: ${statusCode} - ${code}`;
+        const logLine = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - api-key: ${apiKey} ${body} - ${query} - response: ${statusCode} - ${code}`;
         console.log(logLine);
         try {
             fs.appendFileSync(logFilePath, logLine + '\n');
