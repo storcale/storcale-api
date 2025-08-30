@@ -10,7 +10,9 @@ app.use(express.json());
 global.__basedir = `${__dirname}`;
 
 try {
-    require('dotenv').config({ path: path.join(__dirname, 'envs/.env') });
+    const dotenv = require('dotenv')
+    dotenv.config({ path: path.join(__dirname, 'envs/.env') });
+    dotenv.config({ path: path.join(__dirname, 'envs/webhooks.env') });
     console.log('dotenv loaded');
 } catch (error) {
     console.error('Error loading .env:', error);
