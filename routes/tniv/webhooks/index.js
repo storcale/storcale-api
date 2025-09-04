@@ -8,21 +8,39 @@ let lastWebhookContent = null;
 const { notifyDeniedWebhook } = require(path.join(global.__basedir, "utils/notify.js"))
 
 function cleanPayload(payload) {
+    if (!payload || typeof payload !== "object") return {};
+
+    const allowedFields = [
+        "content",
+        "username",
+        "avatar_url",
+        "tts",
+        "embeds",
+        "allowed_mentions",
+        "components",
+        "attachments",
+        "flags",
+        "thread_name",
+        "thread_id"
+    ];
+
     const cleaned = {};
-    if (typeof payload.content === 'string' && payload.content.length > 0) {
-        cleaned.content = payload.content;
-    }
-    if (Array.isArray(payload.embeds)) {
-        const validEmbeds = payload.embeds.filter(e => e && typeof e === 'object');
-        if (validEmbeds.length > 0) {
-            cleaned.embeds = validEmbeds;
+    for (const key of allowedFields) {
+        if (payload[key] !== undefined) {
+            cleaned[key] = payload[key];
         }
     }
-    if (payload.flags !== undefined) {
-        cleaned.flags = payload.flags;
+
+    if (Array.isArray(cleaned.embeds)) {
+        cleaned.embeds = cleaned.embeds.filter(e => e && typeof e === "object");
+        if (cleaned.embeds.length === 0) {
+            delete cleaned.embeds;
+        }
     }
+
     return cleaned;
 }
+
 
 function containsPing(obj) {
     const pingRegex = /<@([&]?)(\d+)>|@everyone|@here/;
