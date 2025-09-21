@@ -124,7 +124,7 @@ router.post('/', async (req, res) => {
         lastWebhookContent = JSON.stringify(body);
         return res.status(200).json({ body: 'Webhook forwarded.' });
     } catch (err) {
-        return res.status(500).json({ error: 'Failed to forward webhook.', details: err?.response?.data || err?.message || err, TARGET_WEBHOOK_URL: process.env[query.target] });
+        return res.status(500).json({ error: 'Failed to forward webhook.', details: err?.response?.data || err?.message || err, TARGET_WEBHOOK_URL:query.target });
     }
 }
 );
