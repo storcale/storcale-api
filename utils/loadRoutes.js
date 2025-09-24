@@ -47,7 +47,7 @@ function loadRoutes(app, routesDir, apiKeysJson, baseUrl = '/api') {
 
             if (stat.isDirectory()) {
                 walk(fullPath, path.join(prefix, file));
-            } else if (file === 'index.js') {
+            } else if (file === 'index.js' || file === 'index.ts') {
                 const routePath = path.join(prefix).replace(/\\/g, '/');
                 const endpointPath = routePath.replace(/^\/?/, '');
                 const router = require(fullPath);
