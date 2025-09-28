@@ -105,8 +105,6 @@ router.post('/', async (req, res) => {
             notifyDeniedWebhook(hasPing, hasKeyword, isDuplicate, info)
         }
         lastWebhookContent = JSON.stringify(body);
-        console.log(keywords)
-        console.log(query)
         return res.status(403).json({ error: `Webhook denied. ${hasPing} ${hasKeyword}  ${isDuplicate}` });
     }
 
