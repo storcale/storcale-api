@@ -185,7 +185,7 @@ const router = express.Router();
 // Stats endpoint
 router.get('/stats', async (req, res) => {
     try {
-        const { type, eventType, from, since, to, until } = req.query;
+        const { type, eventType, from, since, to,until, username } = req.query;
 
         let dbInstance;
         switch (type) {
@@ -204,7 +204,7 @@ router.get('/stats', async (req, res) => {
             if (parts.length >= 3) {
                 const [month, day, year] = parts;
                 if (parts.length >= 6) {
-                    const [month, day, year, hour, min, sec] = parts;
+                        const { type, eventType, from, to, username } = req.query;
                     return new Date(year, month - 1, day, hour || 0, min || 0, sec || 0);
                 }
                 return new Date(year, month - 1, day);
@@ -227,11 +227,36 @@ router.get('/stats', async (req, res) => {
         if (eventType) {
             events = dbInstance.getEvent(eventType);
         }
-        if (from || since || to || until) {
+        if (from || to) {
             events = filterByDate(events);
         }
 
-        // Stats 
+        if (username) {
+            const hostedEvents = events.filter(ev => ev.username && ev.username.toLowerCase() === username.toLowerCase());
+            const attendedEvents = events.filter(ev => {
+                if (!ev.attendance) return false;
+                return ev.attendance.split(/[,;]/).map(a => a.trim().toLowerCase()).includes(username.toLowerCase());
+            });
+            const eventTypeCounts = {};
+            hostedEvents.forEach(ev => {
+                if (ev.event_type) {
+                    eventTypeCounts[ev.event_type] = (eventTypeCounts[ev.event_type] || 0) + 1;
+                }
+            });
+            let MostHostedEventType = null;
+            if (Object.keys(eventTypeCounts).length > 0) {
+                MostHostedEventType = Object.entries(eventTypeCounts).sort((a, b) => b[1] - a[1])[0][0];
+            }
+            return res.json({
+                stats: {
+                    hostedCount: hostedEvents.length,
+                    attendedCount: attendedEvents.length,
+                    MostHostedEventType
+                }
+            });
+        }
+
+        // Otherwise, return general stats
         const EventCount = events.length;
         const hostCounts = {};
         events.forEach(ev => {
