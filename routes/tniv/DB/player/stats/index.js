@@ -114,6 +114,7 @@ router.get('/', async (req, res) => {
         }
 
         let stats = { Ping: 0, Kills: 0, Deaths: 0 };
+        let pingCount = 0;
         let matchesArr = [];
         let commands = [];
         if (fs.existsSync(matches)) {
@@ -130,7 +131,10 @@ router.get('/', async (req, res) => {
                 if (obj.leaderstats) {
                     for (const key of Object.keys(obj.leaderstats)) {
                         if (String(key) === String(userId)) {
-                            stats.Ping += obj.leaderstats[key].Ping || 0;
+                            if (typeof obj.leaderstats[key].Ping === 'number') {
+                                stats.Ping += obj.leaderstats[key].Ping;
+                                pingCount++;
+                            }
                             stats.Kills += obj.leaderstats[key].Kills || 0;
                             stats.Deaths += obj.leaderstats[key].Deaths || 0;
                         }
@@ -142,6 +146,7 @@ router.get('/', async (req, res) => {
                 }
             }
         }
+        if (pingCount > 0) stats.Ping = Math.round(stats.Ping / pingCount);
 
         const { stats: ifStats, matches: ifMatches, commands: ifCommands } = req.query;
         const response = {};
