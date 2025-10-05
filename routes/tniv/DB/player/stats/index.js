@@ -115,6 +115,7 @@ router.get('/', async (req, res) => {
 
         let stats = { Ping: 0, Kills: 0, Deaths: 0 };
         let pingCount = 0;
+        let totalPlayTime = 0;
         let matchesArr = [];
         let commands = [];
         if (fs.existsSync(matches)) {
@@ -140,6 +141,11 @@ router.get('/', async (req, res) => {
                         }
                     }
                 }
+                if (obj.playTimeList && obj.playTimeList[userId]) {
+                    const pt = obj.playTimeList[userId];
+                    if (typeof pt.defenders === 'number') totalPlayTime += pt.defenders;
+                    if (typeof pt.attackers === 'number') totalPlayTime += pt.attackers;
+                }
                 matchesArr.push(obj);
                 if (Array.isArray(obj.logs)) {
                     commands.push(...obj.logs.filter(l => String(l.userId) === String(userId)));
@@ -147,6 +153,7 @@ router.get('/', async (req, res) => {
             }
         }
         if (pingCount > 0) stats.Ping = Math.round(stats.Ping / pingCount);
+        stats.playTime = Math.round(totalPlayTime / 60);
 
         const { stats: ifStats, matches: ifMatches, commands: ifCommands } = req.query;
         const response = {};
