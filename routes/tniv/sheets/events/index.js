@@ -27,6 +27,11 @@
  *         schema:
  *           type: string
  *         description: Filter events up to this date (inclusive)
+ *       - in: query
+ *         name: against
+ *         schema:
+ *           type: string
+ *         description: If present, return top N opponent groups for raid/defense events. If given a number (e.g. against=5) returns top 5. If present without a number, returns top 1.
  *     responses:
  *       200:
  *         description: List of filtered events
@@ -99,6 +104,11 @@
  *         schema:
  *           type: string
  *         description: Filter events up to this date (inclusive)
+ *       - in: query
+ *         name: against
+ *         schema:
+ *           type: string
+ *         description: If present, return top N opponent groups for raid/defense events. If given a number (e.g. against=5) returns top 5. If present without a number, returns top 1.
  *     responses:
  *       200:
  *         description: Statistics for filtered events
@@ -136,6 +146,17 @@
  *                       type: integer
  *                     LoseCount:
  *                       type: integer
+ *                     MostAgainst:
+ *                       type: string
+ *                     TopAgainst:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           against:
+ *                             type: string
+ *                           count:
+ *                             type: integer
  *       400:
  *         description: Invalid params
  *       500:
@@ -301,6 +322,52 @@ router.get('/stats', async (req, res) => {
                 .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
             WinCount = winCount;
             LoseCount = loseCount;
+            // Against
+            if (req.query.against !== undefined) {
+                const topN = (function () {
+                    const v = req.query.against;
+                    const n = Number(v);
+                    if (v === '' || v === 'true' || isNaN(n)) return 1;
+                    return n > 0 ? Math.floor(n) : 1;
+                })();
+                const againstCounts = {};
+                events.forEach(ev => {
+                    if (!ev.against) return;
+                    ev.against.split(/[,;]/).map(a => a.trim()).filter(Boolean).forEach(a => {
+                        againstCounts[a] = (againstCounts[a] || 0) + 1;
+                    });
+                });
+                const topAgainst = Object.entries(againstCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, topN)
+                    .map(([against, count]) => ({ against, count }));
+                if (topN === 1) {
+                    TopMap = TopMap; 
+                    return res.json({
+                        stats: {
+                            EventCount,
+                            TopHosts,
+                            TopAttendees,
+                            ...(TopMap ? { TopMap } : {}),
+                            ...(WinCount !== null ? { WinCount } : {}),
+                            ...(LoseCount !== null ? { LoseCount } : {}),
+                            topAgainst: topAgainst[0]?.against || null
+                        }
+                    });
+                } else {
+                    return res.json({
+                        stats: {
+                            EventCount,
+                            TopHosts,
+                            TopAttendees,
+                            ...(TopMap ? { TopMap } : {}),
+                            ...(WinCount !== null ? { WinCount } : {}),
+                            ...(LoseCount !== null ? { LoseCount } : {}),
+                            TopAgainst: topAgainst
+                        }
+                    });
+                }
+            }
         }
 
         return res.json({
