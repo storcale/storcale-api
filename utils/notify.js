@@ -1,3 +1,5 @@
+const { act } = require("react");
+
 const action_ex = {
     "action": "http",
     "label": "Close door",
@@ -62,10 +64,65 @@ async function notifyDeniedWebhook(hasPing, hasVanguard, isDuplicate, info) {
         const email = process.env.EMAIL || "";
         const response = await notify(title, message, priority, actions, click, email);
         return response;
-    } catch(e) {
+    } catch (e) {
         console.error("notifyDeniedWebhook error:", e);
         return e;
     }
 }
 
-module.exports = { notify, notifyDeniedWebhook };
+
+async function notifyRateLimitExceeded(reqInfo) {
+    try {
+        const title = 'TNIV API | Rate limit exceeded';
+        const priority = 3;
+        const parts = [];
+        if (reqInfo && reqInfo.ip) parts.push(`IP: ${reqInfo.ip}`);
+        if (reqInfo && reqInfo.path) parts.push(`Path: ${reqInfo.path}`);
+        if (reqInfo && reqInfo.method) parts.push(`Method: ${reqInfo.method}`);
+        if (reqInfo && reqInfo.query) parts.push(`Query: ${JSON.stringify(reqInfo.query)}`);
+        if (reqInfo && reqInfo.body) parts.push(`Body: ${JSON.stringify(reqInfo.body)}`);
+        if (reqInfo && reqInfo.count) parts.push(`Count: ${reqInfo.count}`);
+        if (reqInfo && reqInfo.rateLimit !== undefined) parts.push(`Rate limit: ${reqInfo.rateLimit}`);
+        const message = parts.join('\n') || 'Rate limit exceeded - no details.';
+
+        const url = process.env.BASE_URL || 'https://storcale-api.omegadev.xyz';
+        const apiKey = process.env.ADMIN_KEY || '';
+        const actions = [];
+        // Ban IP action
+        if (reqInfo && reqInfo.ip) {
+            actions.push({
+                action: 'http',
+                label: 'Ban IP',
+                url: `${url}/api/admin/internal/ban-ip`,
+                method: 'POST',
+                headers: {
+                    'api-key': apiKey,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ip: reqInfo.ip, reason: 'rate-limit exceeded' })
+            });
+        }
+        if ( reqInfo.apiKey) {
+            actions.push({
+                "action": "http",
+                "label": "Revoke key",
+                "url": `${url}/api/admin/internal/deactivate`,
+                "method": "PUT",
+                "headers": {
+                    "api-key": apiKey
+                },
+                "body": `{"key": "${reqInfo.apiKey}"}`
+            });
+        }
+        // Show logs (click) — opens admin dashboard logs
+        const click = `${url}/api/admin/dashboard?api-key=${apiKey}`;
+
+        const response = await notify(title, message, priority, actions.length ? actions : null, click, null);
+        return response;
+    } catch (e) {
+        console.error('notifyRateLimitExceeded error', e);
+        return null;
+    }
+}
+
+module.exports = { notify, notifyDeniedWebhook, notifyRateLimitExceeded };

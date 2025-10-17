@@ -10,9 +10,10 @@
 <body>
     <button id="sidebarToggle" class="w3-button w3-xlarge w3-hide-large w3-teal" style="position:fixed;top:10px;left:10px;z-index:1001;">&#9776;</button>
     <div class="w3-sidebar w3-bar-block w3-card" style="width:150px;display:block;position:fixed;top:0;left:0;height:100vh;z-index:10;" id="mySidebar">
-        <a href="#" class="w3-bar-item w3-button" id="log">Logs</a>
-        <a href="#" class="w3-bar-item w3-button" id="key">Key Manager</a>
-        <a href="#" class="w3-bar-item w3-button" id="docs">Docs</a>
+    <a href="#" class="w3-bar-item w3-button" id="log">Logs</a>
+    <a href="#" class="w3-bar-item w3-button" id="key">Key Manager</a>
+    <a href="#" class="w3-bar-item w3-button" id="bans">Bans</a>
+    <a href="#" class="w3-bar-item w3-button" id="docs">Docs</a>
     </div>
 
     <div id="main-wrapper" style="margin-left:150px; transition: margin-left 0.3s;">
@@ -20,6 +21,12 @@
         <div class="w3-teal">
             <div class="w3-container">
                 <h1>Admin Dashboard</h1>
+            </div>
+            <div class="w3-container w3-light-grey" style="padding:8px;">
+                <input id="adminKeyInput" placeholder="Admin API Key" class="w3-input w3-margin-bottom" />
+                <input id="adminSecretInput" placeholder="Admin Secret (kept in memory)" type="password" class="w3-input w3-margin-bottom" />
+                <button id="adminLoginBtn" class="w3-button w3-teal">Login (store in page)</button>
+                <span id="adminLoginStatus" style="margin-left:12px;color:#fff"></span>
             </div>
             <div class="w3-container w3-grey " id="Description">
                 <p>Welcome to the admin dashboard. Here you can manage your application settings.</p>
@@ -61,6 +68,24 @@
                         </div>
                         <div class="w3-padding-16 w3-margin-bottom">
                             <button class="w3-button w3-blue w3-large">Update</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="bansPanel" class="w3-container w3-grey" style="display:none;">
+                <div class="w3-card-4 w3-margin">
+                    <header class="w3-container w3-blue">
+                        <h2>IP Bans</h2>
+                    </header>
+                    <div class="w3-container" style="padding:12px;">
+                        <div>
+                            <input type="text" id="banIpInput" placeholder="Enter IP to ban" class="w3-input w3-margin-bottom" />
+                            <button id="banAddBtn" class="w3-button w3-green">Ban IP</button>
+                        </div>
+                        <hr />
+                        <div>
+                            <h3>Current bans</h3>
+                            <ul id="bansList" class="w3-ul"></ul>
                         </div>
                     </div>
                 </div>
@@ -150,12 +175,10 @@
             const apiKey = urlParams.get('api-key');
 
             try {
+                const auth = await getAuthHeaders('/api/admin/logs?n=1000', 'GET');
                 const response = await fetch('/api/admin/logs?n=1000', {
                     method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "api-key": apiKey
-                    }
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, auth)
                 });
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
@@ -190,6 +213,107 @@
             document.getElementById('logs').style.display = 'none';
         });
 
+        // Bans panel
+        document.getElementById('bans').addEventListener('click', function () {
+            document.getElementById('bansPanel').style.display = 'block';
+            document.getElementById('keys').style.display = 'none';
+            document.getElementById('logs').style.display = 'none';
+            document.getElementById('Description').innerHTML = "<p>Manage IP bans: list, add or remove banned IPs.</p>"
+            loadBans();
+        });
+
+        async function loadBans() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiKey = urlParams.get('api-key');
+            const list = document.getElementById('bansList');
+            list.innerHTML = '<li>Loading...</li>';
+            try {
+                const auth = await getAuthHeaders('/api/admin/internal/ban-ips', 'GET');
+                const res = await fetch('/api/admin/internal/ban-ips', {
+                    method: 'GET',
+                    headers: auth
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                list.innerHTML = '';
+                if (data && Array.isArray(data.bans)) {
+                    data.bans.forEach(ip => {
+                        const li = document.createElement('li');
+                        li.className = 'w3-bar';
+                        li.innerHTML = `<div class="w3-bar-item">${ip}</div><div class="w3-bar-item w3-right"><button class="w3-button w3-red w3-small" data-ip="${ip}">Unban</button></div>`;
+                        list.appendChild(li);
+                    });
+                    // attach handlers
+                    list.querySelectorAll('button[data-ip]').forEach(btn => {
+                        btn.addEventListener('click', async (e) => {
+                            const ip = e.target.getAttribute('data-ip');
+                            await unbanIp(ip);
+                        });
+                    });
+                } else if (data && typeof data.bans === 'object') {
+                    // older JSON format: object map
+                    const arr = Object.keys(data.bans || {});
+                    arr.forEach(ip => {
+                        const li = document.createElement('li');
+                        li.className = 'w3-bar';
+                        li.innerHTML = `<div class="w3-bar-item">${ip}</div><div class="w3-bar-item w3-right"><button class="w3-button w3-red w3-small" data-ip="${ip}">Unban</button></div>`;
+                        list.appendChild(li);
+                    });
+                    list.querySelectorAll('button[data-ip]').forEach(btn => {
+                        btn.addEventListener('click', async (e) => {
+                            const ip = e.target.getAttribute('data-ip');
+                            await unbanIp(ip);
+                        });
+                    });
+                } else {
+                    list.innerHTML = '<li>No bans</li>';
+                }
+            } catch (err) {
+                list.innerHTML = `<li>Error: ${err.message}</li>`;
+            }
+        }
+
+        async function banIp(ip) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiKey = urlParams.get('api-key');
+            try {
+                const auth = await getAuthHeaders('/api/admin/internal/ban-ip', 'POST');
+                const res = await fetch('/api/admin/internal/ban-ip', {
+                    method: 'POST',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, auth),
+                    body: JSON.stringify({ ip })
+                });
+                const data = await res.json();
+                showNotification(data.body || data.error || 'Result', data.error ? 'w3-red' : 'w3-green');
+                await loadBans();
+            } catch (err) {
+                showNotification(err.message, 'w3-red');
+            }
+        }
+
+        async function unbanIp(ip) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiKey = urlParams.get('api-key');
+            try {
+                const auth = await getAuthHeaders(`/api/admin/internal/ban-ip?ip=${encodeURIComponent(ip)}`, 'DELETE');
+                const res = await fetch(`/api/admin/internal/ban-ip?ip=${encodeURIComponent(ip)}`, {
+                    method: 'DELETE',
+                    headers: auth
+                });
+                const data = await res.json();
+                showNotification(data.body || data.error || 'Result', data.error ? 'w3-red' : 'w3-green');
+                await loadBans();
+            } catch (err) {
+                showNotification(err.message, 'w3-red');
+            }
+        }
+
+        document.getElementById('banAddBtn').addEventListener('click', function () {
+            const ip = document.getElementById('banIpInput').value.trim();
+            if (!ip) return showNotification('Please enter an IP', 'w3-red');
+            banIp(ip);
+        });
+
         // Notification helper
         function showNotification(msg, color = 'w3-green') {
             const note = document.getElementById('notification');
@@ -197,6 +321,59 @@
             note.innerHTML = `<span onclick=\"this.parentElement.style.display='none'\" class='w3-button w3-large w3-display-topright'>&times;</span>${msg}`;
             note.style.display = 'block';
             setTimeout(() => { note.style.display = 'none'; }, 6000);
+        }
+
+        let adminApiKey = null;
+        let adminSecret = null;
+
+        document.getElementById('adminLoginBtn').addEventListener('click', function () {
+            const k = document.getElementById('adminKeyInput').value.trim();
+            const s = document.getElementById('adminSecretInput').value.trim();
+            if (!k || !s) return showNotification('Provide api-key and secret', 'w3-red');
+            adminApiKey = k;
+            adminSecret = s;
+            document.getElementById('adminLoginStatus').textContent = 'Logged in';
+            showNotification('Admin credentials stored in page memory', 'w3-green');
+        });
+
+        // Auto-login from URL params if provided (connect.html will pass secret optionally)
+        (function autoLoginFromUrl() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const k = params.get('api-key');
+                const s = params.get('secret');
+                if (k) document.getElementById('adminKeyInput').value = k;
+                if (s) document.getElementById('adminSecretInput').value = s;
+                if (k && s) {
+                    adminApiKey = k;
+                    adminSecret = s;
+                    document.getElementById('adminLoginStatus').textContent = 'Logged in (from URL)';
+                    // Remove secret from URL to avoid leaking in history
+                    params.delete('secret');
+                    const newUrl = `${location.pathname}?${params.toString()}`;
+                    history.replaceState({}, document.title, newUrl);
+                }
+            } catch (e) {
+                console.error('autoLoginFromUrl error', e);
+            }
+        })();
+
+        async function hmacHex(secret, message) {
+            const enc = new TextEncoder();
+            const keyData = enc.encode(secret);
+            const key = await window.crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+            const sig = await window.crypto.subtle.sign('HMAC', key, enc.encode(message));
+            const bytes = new Uint8Array(sig);
+            return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function getAuthHeaders(originalUrl, method) {
+            if (!adminApiKey || !adminSecret) return {};
+            const timestamp = new Date().toISOString();
+            // server signs rawData = `${req.originalUrl}|${timestamp}`
+            const rawData = `${originalUrl}|${timestamp}`;
+            const signature = await hmacHex(adminSecret, rawData);
+            return { 'api-key': adminApiKey, 'timestamp': timestamp, 'signature': signature };
         }
 
         // Add Key

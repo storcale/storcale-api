@@ -1,16 +1,18 @@
 const fs = require('fs');
 const path = require('path');
-
+const rateLimitPerKey = require('./rateLimit');
+const signatureMiddleware = require('./signature');
+const { validateSession } = require('./adminSessions');
 
 function getPermsForPath(apiKeysJson, endpointPath) {
     const perms = {};
     const allKeys = [];
-        for (const [category, entry] of Object.entries(apiKeysJson)) {
-            if (category === 'perms' || category === 'publicDirs') continue;
-            if (!entry.valid) continue; 
-            const key = entry.key;
+    for (const [category, entry] of Object.entries(apiKeysJson)) {
+        if (category === 'perms' || category === 'publicDirs') continue;
+        if (!entry.valid) continue;
+        const key = entry.key;
         const keyPerms = (entry.perm || '').split(',').map(p => p.trim());
-        
+
         keyPerms.forEach(p => {
             perms[p] = perms[p] || [];
             perms[p].push(key);
@@ -29,6 +31,18 @@ function getPermsForPath(apiKeysJson, endpointPath) {
 function apiKeyMiddleware(allowedKeys) {
     // Find the apiKeysJson in closure
     return (req, res, next) => {
+        // support session token for admin UI: 'x-admin-session' header
+        const sessionToken = req.get('x-admin-session') || req.query?.['admin-session'];
+        if (sessionToken) {
+            const apiKey = validateSession(sessionToken);
+            if (!apiKey) return res.status(401).json({ error: 'Invalid or expired session' });
+            if (!allowedKeys.includes(apiKey)) return res.status(403).json({ error: 'Invalid API key for this endpoint' });
+            // attach session info and skip signature requirement later
+            req.key = apiKey;
+            req.adminSession = sessionToken;
+            return next();
+        }
+
         const key = req.get('api-key') || req.query?.['api-key'];
         if (!key) return res.status(401).json({ error: 'API key required' });
         if (!allowedKeys.includes(key)) return res.status(403).json({ error: 'Invalid API key' });
@@ -36,7 +50,6 @@ function apiKeyMiddleware(allowedKeys) {
         next();
     };
 }
-
 function loadRoutes(app, routesDir, apiKeysJson, baseUrl = '/api') {
     const publicDirs = (apiKeysJson.publicDirs || []).map(dir => dir.toLowerCase());
 
@@ -60,7 +73,17 @@ function loadRoutes(app, routesDir, apiKeysJson, baseUrl = '/api') {
                     console.log(`Mounted PUBLIC route: ${baseUrl}/${endpointPath}`);
                 } else {
                     const allowedKeys = getPermsForPath(apiKeysJson, endpointPath);
-                    const middleware = apiKeyMiddleware(allowedKeys);
+                    // We'll use a wrapper that enforces rate-limiting, and only runs signature middleware
+                    // when the request did not authenticate via admin session token.
+                    const middleware = [
+                        apiKeyMiddleware(allowedKeys),
+                        rateLimitPerKey(apiKeysJson),
+                        // conditional signature check
+                        (req, res, next) => {
+                            if (req.adminSession) return next();
+                            return signatureMiddleware(apiKeysJson)(req, res, next);
+                        }
+                    ];
                     // console.log(`Allowed keys for ${endpointPath}:`, allowedKeys);
                     app.use(`${baseUrl}/${endpointPath}`, middleware, router);
                     console.log(`Mounted PROTECTED route: ${baseUrl}/${endpointPath}`);

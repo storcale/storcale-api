@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+</head>
+
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+        <style>
+            #main-wrapper { margin-left: 150px; transition: margin-left 0.3s; }
+            #mySidebar { width:150px; position:fixed; top:0; left:0; height:100vh; z-index:10; }
+            /* log text green, admin entries highlighted with red background */
+            .log-item { color: #0a0; }
+            .log-item.admin { background: #ffdddd; border-left: 4px solid #ff4d4d; color: #060; }
+            pre.logline { white-space: pre-wrap; word-break: break-word; margin:0; }
+        </style>
+</head>
+<body>
+    <button id="sidebarToggle" class="w3-button w3-xlarge w3-hide-large w3-teal" style="position:fixed;top:10px;left:10px;z-index:1001">&#9776;</button>
+    <div id="mySidebar" class="w3-sidebar w3-bar-block w3-card">
+        <a href="#" class="w3-bar-item w3-button" id="tabLogs">Logs</a>
+        <a href="#" class="w3-bar-item w3-button" id="tabStats">Stats</a>
+        <a href="#" class="w3-bar-item w3-button" id="tabBans">Bans</a>
+        <a href="#" class="w3-bar-item w3-button w3-red" id="logout">Logout</a>
+    </div>
+
+    <div id="main-wrapper">
+        <div class="w3-container w3-teal"><h2 style="margin:8px">Admin Dashboard</h2></div>
+
+        <div id="panelLogs" class="w3-container" style="display:none; padding:12px;">
+            <h3>Logs</h3>
+            <div id="logsControls" class="w3-margin-bottom">
+                <label>Lines to load: <input id="logCount" type="number" value="200" style="width:80px"/></label>
+                <button id="reloadLogs" class="w3-button w3-small">Reload</button>
+            </div>
+            <div id="logsArea"></div>
+        </div>
+
+        <div id="panelStats" class="w3-container" style="display:none; padding:12px;">
+            <h3>Stats</h3>
+            <pre id="statsArea">Loading...</pre>
+        </div>
+
+        <div id="panelBans" class="w3-container" style="display:none; padding:12px;">
+            <h3>Bans</h3>
+            <div class="w3-row">
+                <div class="w3-col s6">
+                    <input id="banip" placeholder="IP to ban" class="w3-input w3-margin-bottom"/>
+                    <button id="banbtn" class="w3-button w3-green">Ban</button>
+                </div>
+            </div>
+            <ul id="banslist" class="w3-ul w3-margin-top"></ul>
+        </div>
+    </div>
+
+    <script>
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebar = document.getElementById('mySidebar');
+        sidebarToggle && sidebarToggle.addEventListener('click', ()=> sidebar.classList.toggle('open'));
+
+        function showPanel(name) {
+            document.getElementById('panelLogs').style.display = name==='logs' ? 'block' : 'none';
+            document.getElementById('panelStats').style.display = name==='stats' ? 'block' : 'none';
+            document.getElementById('panelBans').style.display = name==='bans' ? 'block' : 'none';
+        }
+
+        document.getElementById('tabLogs').addEventListener('click', ()=>{ showPanel('logs'); loadLogs(); });
+        document.getElementById('tabStats').addEventListener('click', ()=>{ showPanel('stats'); loadStats(); });
+        document.getElementById('tabBans').addEventListener('click', ()=>{ showPanel('bans'); loadBans(); });
+
+        document.getElementById('logout').addEventListener('click', async ()=>{ await fetch('/api/admin-ui/logout',{method:'POST'}); window.location.href='/admin-ui/login'; });
+
+        // Logs rendering — readable list, admin lines highlighted
+            async function loadLogs() {
+            const n = Number(document.getElementById('logCount').value) || 200;
+            const area = document.getElementById('logsArea');
+            area.innerHTML = '<p>Loading logs...</p>';
+            try {
+                    const res = await fetch(`/api/admin-ui/logs?n=${n}`, { credentials: 'same-origin' });
+                const j = await res.json();
+                if (!res.ok) { area.innerHTML = `<p class="w3-text-red">${j.error||'Failed to load'}</p>`; return; }
+                const ul = document.createElement('ul'); ul.className='w3-ul w3-card-4 w3-hoverable';
+                (j.logs||[]).slice().reverse().forEach(line=>{
+                    const li = document.createElement('li');
+                        li.className = 'w3-padding-small log-item';
+                    if (typeof line === 'string') {
+                        const pre = document.createElement('pre'); pre.className='logline'; pre.textContent = line;
+                        li.appendChild(pre);
+                        if (line.toLowerCase().includes('admin')) li.classList.add('admin');
+                    } else {
+                        li.textContent = JSON.stringify(line);
+                    }
+                    ul.appendChild(li);
+                });
+                area.innerHTML=''; area.appendChild(ul);
+            } catch (e) { area.innerHTML = `<p class="w3-text-red">${e.message}</p>`; }
+        }
+
+        document.getElementById('reloadLogs').addEventListener('click', loadLogs);
+
+        // Stats
+            async function loadStats(){
+                const res = await fetch('/api/admin-ui/stats', { credentials: 'same-origin' });
+                const j = await res.json();
+                if (!res.ok) { document.getElementById('statsArea').textContent = j.error || 'Failed to load stats'; return; }
+                // compute average per day
+                const perDay = j.perDay || {};
+                const days = Object.keys(perDay).length || 1;
+                const total = j.total || 0;
+                const avg = (total / days).toFixed(2);
+                const values = Object.values(perDay);
+                const max = values.length ? Math.max(...values) : 0;
+                const min = values.length ? Math.min(...values) : 0;
+                const out = `Total requests: ${total}\nDays recorded: ${days}\nAverage per day: ${avg}\nMax in a day: ${max}\nMin in a day: ${min}`;
+                document.getElementById('statsArea').textContent = out;
+            }
+
+        // Bans
+            async function loadBans(){
+                const res = await fetch('/api/admin-ui/bans', { credentials: 'same-origin' });
+                const j = await res.json();
+                const ul = document.getElementById('banslist'); ul.innerHTML='';
+                const bans = j.bans || {};
+                Object.keys(bans).forEach(ip=>{
+                    const li = document.createElement('li'); li.className='w3-bar';
+                    li.innerHTML = `<div class="w3-bar-item">${ip} - ${bans[ip].reason||''}</div><div class="w3-bar-item w3-right"><button class="w3-button w3-red" data-ip="${ip}">Unban</button></div>`;
+                    ul.appendChild(li);
+                });
+                ul.querySelectorAll('button[data-ip]').forEach(btn=>btn.addEventListener('click', async (e)=>{ const ip=e.target.getAttribute('data-ip'); await fetch(`/api/admin-ui/bans?ip=${encodeURIComponent(ip)}`,{method:'DELETE', credentials:'same-origin'}); await loadBans(); }));
+            }
+
+        document.getElementById('banbtn').addEventListener('click', async ()=>{ const ip=document.getElementById('banip').value.trim(); if(!ip) return; await fetch('/api/admin-ui/bans',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip})}); document.getElementById('banip').value=''; await loadBans(); });
+
+        // Initialize default tab
+        showPanel('logs'); loadLogs();
+    </script>
+</body>
+</html>
