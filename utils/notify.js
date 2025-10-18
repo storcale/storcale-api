@@ -1,5 +1,3 @@
-const { act } = require("react");
-
 const action_ex = {
     "action": "http",
     "label": "Close door",
