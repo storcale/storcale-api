@@ -28,7 +28,8 @@
         <a href="#" class="w3-bar-item w3-button" id="tabLogs">Logs</a>
         <a href="#" class="w3-bar-item w3-button" id="tabStats">Stats</a>
         <a href="#" class="w3-bar-item w3-button" id="tabBans">Bans</a>
-        <a href="#" class="w3-bar-item w3-button w3-red" id="logout">Logout</a>
+    <a href="#" class="w3-bar-item w3-button" id="tabKeys">Keys</a>
+    <a href="#" class="w3-bar-item w3-button w3-red" id="logout">Logout</a>
     </div>
 
     <div id="main-wrapper">
@@ -39,6 +40,7 @@
             <div id="logsControls" class="w3-margin-bottom">
                 <label>Lines to load: <input id="logCount" type="number" value="200" style="width:80px"/></label>
                 <button id="reloadLogs" class="w3-button w3-small">Reload</button>
+                <button id="reloadServer" class="w3-button w3-small w3-orange">Reload server</button>
             </div>
             <div id="logsArea"></div>
         </div>
@@ -58,6 +60,11 @@
             </div>
             <ul id="banslist" class="w3-ul w3-margin-top"></ul>
         </div>
+
+        <div id="panelKeys" class="w3-container" style="display:none; padding:12px;">
+            <h3>API Keys</h3>
+            <div id="keysArea">Loading...</div>
+        </div>
     </div>
 
     <script>
@@ -66,14 +73,16 @@
         sidebarToggle && sidebarToggle.addEventListener('click', ()=> sidebar.classList.toggle('open'));
 
         function showPanel(name) {
-            document.getElementById('panelLogs').style.display = name==='logs' ? 'block' : 'none';
-            document.getElementById('panelStats').style.display = name==='stats' ? 'block' : 'none';
-            document.getElementById('panelBans').style.display = name==='bans' ? 'block' : 'none';
+                    document.getElementById('panelLogs').style.display = name==='logs' ? 'block' : 'none';
+                    document.getElementById('panelStats').style.display = name==='stats' ? 'block' : 'none';
+                    document.getElementById('panelBans').style.display = name==='bans' ? 'block' : 'none';
+                    document.getElementById('panelKeys').style.display = name==='keys' ? 'block' : 'none';
         }
 
         document.getElementById('tabLogs').addEventListener('click', ()=>{ showPanel('logs'); loadLogs(); });
         document.getElementById('tabStats').addEventListener('click', ()=>{ showPanel('stats'); loadStats(); });
         document.getElementById('tabBans').addEventListener('click', ()=>{ showPanel('bans'); loadBans(); });
+    document.getElementById('tabKeys').addEventListener('click', ()=>{ showPanel('keys'); loadKeys(); });
 
         document.getElementById('logout').addEventListener('click', async ()=>{ await fetch('/api/admin-ui/logout',{method:'POST'}); window.location.href='/admin-ui/login'; });
 
@@ -104,6 +113,21 @@
         }
 
         document.getElementById('reloadLogs').addEventListener('click', loadLogs);
+
+        document.getElementById('reloadServer').addEventListener('click', async ()=>{
+            if (!confirm('Run reload script on server? This may restart services.')) return;
+            try {
+                const res = await fetch('/api/admin-ui/reload', { method: 'POST', credentials: 'same-origin' });
+                const j = await res.json();
+                if (!res.ok) {
+                    alert('Reload failed: ' + (j.error || JSON.stringify(j)));
+                } else {
+                    alert('Reload executed. Output:\n' + (j.output || JSON.stringify(j)));
+                }
+            } catch (e) {
+                alert('Reload request failed: ' + e.message);
+            }
+        });
 
         // Stats
             async function loadStats(){
@@ -137,6 +161,31 @@
             }
 
         document.getElementById('banbtn').addEventListener('click', async ()=>{ const ip=document.getElementById('banip').value.trim(); if(!ip) return; await fetch('/api/admin-ui/bans',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip})}); document.getElementById('banip').value=''; await loadBans(); });
+
+        // Keys
+        async function loadKeys(){
+            const res = await fetch('/api/admin-ui/keys', { credentials: 'same-origin' });
+            const j = await res.json();
+            const area = document.getElementById('keysArea');
+            if (!res.ok) { area.textContent = j.error || 'Failed to load keys'; return; }
+            const keys = j.keys || [];
+            const ul = document.createElement('ul'); ul.className='w3-ul w3-card-4';
+            keys.forEach(k=>{
+                const li = document.createElement('li'); li.className='w3-bar';
+                const name = document.createElement('div'); name.className='w3-bar-item'; name.textContent = `${k.name} (${k.masked||'no-key'})`;
+                const btnWrap = document.createElement('div'); btnWrap.className='w3-bar-item w3-right';
+                const btn = document.createElement('button'); btn.className='w3-button w3-red'; btn.textContent='Deactivate'; btn.dataset.key = k.id || k.name;
+                if (!k.valid) { btn.disabled = true; btn.textContent = 'Inactive'; }
+                btn.addEventListener('click', async ()=>{
+                    if (!confirm('Deactivate this API key?')) return;
+                    await fetch('/api/admin-ui/keys/deactivate', { method: 'PUT', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ key: btn.dataset.key }) });
+                    await loadKeys();
+                });
+                btnWrap.appendChild(btn);
+                li.appendChild(name); li.appendChild(btnWrap); ul.appendChild(li);
+            });
+            area.innerHTML=''; area.appendChild(ul);
+        }
 
         // Initialize default tab
         showPanel('logs'); loadLogs();
