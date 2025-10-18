@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Admin Login</title>
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css"></head>
+<body class="w3-light-grey">
+<div class="w3-container w3-card-4 w3-white" style="max-width:400px;margin:40px auto;padding:20px;">
+<h3>Admin Login</h3>
+<input id="user" class="w3-input w3-margin" placeholder="username"/>
+<input id="pass" type="password" class="w3-input w3-margin" placeholder="password"/>
+<button id="login" class="w3-button w3-teal">Login</button>
+<div id="note"></div>
+</div>
+<script>
+document.getElementById('login').addEventListener('click', async ()=>{
+  const user = document.getElementById('user').value;
+  const pass = document.getElementById('pass').value;
+  const res = await fetch('/api/admin-ui/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})});
+  const j = await res.json();
+  if (res.ok) { window.location.href = '/admin-ui/dashboard'; } else { document.getElementById('note').innerText = j.error || 'Login failed'; }
+});
+</script>
+</body>
+</html>

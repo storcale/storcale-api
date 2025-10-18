@@ -7,16 +7,18 @@
 
 <body>
     <input type="text" id="apiKeyInput" placeholder="Enter API Key" />
+    <input type="password" id="secretInput" placeholder="Enter API Secret (optional)" />
     <button onclick="connect()">Connect</button>
 
     <script>
         function connect() {
             const key = document.getElementById('apiKeyInput').value;
-            if (key !== "") {
-                window.location.href = `/api/admin/dashboard?api-key=${encodeURIComponent(key)}`;
-            } else {
-                alert('Input an API key');
-            }
+            const secret = document.getElementById('secretInput').value;
+            if (!key) return alert('Input an API key');
+            const params = new URLSearchParams();
+            params.set('api-key', key);
+            if (secret) params.set('secret', secret);
+            window.location.href = `/api/admin/dashboard?${params.toString()}`;
         }
     </script>
 </body>

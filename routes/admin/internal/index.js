@@ -3,6 +3,27 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
+const { notifyRateLimitExceeded } = require(path.join(global.__basedir, '/utils/notify.js'));
+const bannedIpsPath = path.join(global.__basedir, '/envs/banned_ips.json');
+const { createSession } = require(path.join(global.__basedir, '/utils/adminSessions.js'));
+
+function readBannedIps() {
+    try {
+        if (!fs.existsSync(bannedIpsPath)) return {};
+        return JSON.parse(fs.readFileSync(bannedIpsPath, 'utf8') || '{}');
+    } catch (e) {
+        return {};
+    }
+}
+
+function writeBannedIps(obj) {
+    try {
+        fs.writeFileSync(bannedIpsPath, JSON.stringify(obj, null, 2));
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
 
 function reload() {
     const scriptPath = path.join(global.__basedir, '/reload.sh');
@@ -22,6 +43,63 @@ router.post('/reload', async (req, res) => {
         
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /ban-ips - list banned IPs
+router.get('/ban-ips', (req, res) => {
+    try {
+        const bans = readBannedIps();
+        return res.json({ bans });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /create-session - create a short-lived admin UI session token
+router.post('/create-session', (req, res) => {
+    try {
+        const apiKey = req.get('api-key') || req.body?.['api-key'];
+        if (!apiKey) return res.status(401).json({ error: 'API key required' });
+        // At this point the route is protected by signature middleware, so apiKey is valid and signed
+        const ttl = Number(req.body?.ttl) || 600; // seconds
+        const { token, expires } = createSession(apiKey, ttl);
+        return res.json({ token, expires });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /ban-ip - ban an IP
+router.post('/ban-ip', (req, res) => {
+    try {
+        const { ip, reason } = req.body || {};
+        if (!ip) return res.status(400).json({ error: 'Missing ip in body.' });
+        const bans = readBannedIps();
+        bans[ip] = {
+            reason: reason || 'unspecified',
+            bannedAt: new Date().toISOString(),
+            bannedBy: req.user?.username || req.body?.by || 'admin'
+        };
+        if (!writeBannedIps(bans)) return res.status(500).json({ error: 'Failed to write bans file.' });
+        return res.json({ body: `IP ${ip} banned.`, bans });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE /ban-ip - unban an IP (body or query ip)
+router.delete('/ban-ip', (req, res) => {
+    try {
+        const ip = req.body?.ip || req.query?.ip;
+        if (!ip) return res.status(400).json({ error: 'Missing ip.' });
+        const bans = readBannedIps();
+        if (!bans[ip]) return res.status(404).json({ error: 'IP not found in bans.' });
+        delete bans[ip];
+        if (!writeBannedIps(bans)) return res.status(500).json({ error: 'Failed to write bans file.' });
+        return res.json({ body: `IP ${ip} unbanned.`, bans });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
     }
 });
 
