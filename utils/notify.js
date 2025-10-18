@@ -58,7 +58,7 @@ async function notifyDeniedWebhook(hasPing, hasVanguard, isDuplicate, info) {
                 "body": `{"key": "${senderKey}"}`
             }
         ];
-        const click = `${url}/api/admin/dashboard?api-key=${apiKey}`;
+    const click = `${url}/admin-ui/dashboard?api-key=${apiKey}`;
         const email = process.env.EMAIL || "";
         const response = await notify(title, message, priority, actions, click, email);
         return response;
@@ -112,8 +112,8 @@ async function notifyRateLimitExceeded(reqInfo) {
                 "body": `{"key": "${reqInfo.apiKey}"}`
             });
         }
-        // Show logs (click) — opens admin dashboard logs
-        const click = `${url}/api/admin/dashboard?api-key=${apiKey}`;
+    // Show logs (click) — opens admin UI dashboard
+    const click = `${url}/admin-ui/dashboard?api-key=${apiKey}`;
 
         const response = await notify(title, message, priority, actions.length ? actions : null, click, null);
         return response;

@@ -86,18 +86,6 @@ try {
     console.error('Failed to mount admin-ui routes', e);
 }
 
-// Convenience root route: if api-key and secret are provided at root, redirect to admin dashboard
-app.get('/', (req, res) => {
-    const key = req.query?.['api-key'] || req.query?.apikey || null;
-    const secret = req.query?.secret || req.query?.s || null;
-    if (key && secret) {
-        // redirect to admin dashboard which will auto-login from URL params
-        return res.redirect(`/api/admin/dashboard?api-key=${encodeURIComponent(key)}&secret=${encodeURIComponent(secret)}`);
-    }
-    // otherwise send admin connect page
-    return res.redirect('/api/admin');
-});
-
 // get api keys
 
 const apiKeyPath = path.join(__dirname, '/envs/apikeys.env.json');
