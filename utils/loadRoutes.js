@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const rateLimitPerKey = require('./rateLimit');
-const signatureMiddleware = require('./signature');
+// signature middleware removed: we only use API keys for auth now
 const { validateSession } = require('./adminSessions');
 
 function getPermsForPath(apiKeysJson, endpointPath) {
@@ -73,16 +73,10 @@ function loadRoutes(app, routesDir, apiKeysJson, baseUrl = '/api') {
                     console.log(`Mounted PUBLIC route: ${baseUrl}/${endpointPath}`);
                 } else {
                     const allowedKeys = getPermsForPath(apiKeysJson, endpointPath);
-                    // We'll use a wrapper that enforces rate-limiting, and only runs signature middleware
-                    // when the request did not authenticate via admin session token.
+                    // We'll use a wrapper that enforces rate-limiting and API key middleware.
                     const middleware = [
                         apiKeyMiddleware(allowedKeys),
                         rateLimitPerKey(apiKeysJson),
-                        // conditional signature check
-                        (req, res, next) => {
-                            if (req.adminSession) return next();
-                            return signatureMiddleware(apiKeysJson)(req, res, next);
-                        }
                     ];
                     // console.log(`Allowed keys for ${endpointPath}:`, allowedKeys);
                     app.use(`${baseUrl}/${endpointPath}`, middleware, router);

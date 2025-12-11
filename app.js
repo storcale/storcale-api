@@ -19,6 +19,7 @@ function readBannedIps() {
         return {};
     }
 }
+
 function writeBannedIps(obj) {
     try {
         fs.writeFileSync(bannedIpsPath, JSON.stringify(obj, null, 2));
@@ -123,7 +124,6 @@ app.use((req, res, next) => {
     if (req.originalUrl.startsWith('/api-docs/') || req.originalUrl === '/api-docs') return next();
     if (!req.originalUrl.startsWith('/api/')) return next();
     const apiKey = req.get('api-key') || req.query?.['api-key'] || 'none';
-    const signature = req.get('signature') || 'none';
     const timestamp = req.get('timestamp') || 'none';
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
@@ -140,7 +140,7 @@ app.use((req, res, next) => {
     const windowStart = now - limits.windowSec;
     const recent = arr.filter(t => t >= windowStart);
     const rateLeft = Math.max(0, limits.max - recent.length);
-        const logLine = `[${new Date().toISOString()}] ${req.method} ${req.url} - api-key: ${apiKey} - signature: ${signature} - timestamp: ${timestamp} ${body} - query: ${query} - response: ${statusCode} - ip: ${clientIp} - rateLeft: ${rateLeft}`;
+            const logLine = `[${new Date().toISOString()}] ${req.method} ${req.url} - api-key: ${apiKey} - timestamp: ${timestamp} ${body} - query: ${query} - response: ${statusCode} - ip: ${clientIp} - rateLeft: ${rateLeft}`;
         
         console.log(logLine);
 
@@ -153,7 +153,6 @@ app.use((req, res, next) => {
 
     next();
 });
-
 
 app.use((req, res, next) => {
     if (!req.originalUrl.startsWith('/api/')) return next();

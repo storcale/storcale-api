@@ -61,7 +61,7 @@ router.post('/create-session', (req, res) => {
     try {
         const apiKey = req.get('api-key') || req.body?.['api-key'];
         if (!apiKey) return res.status(401).json({ error: 'API key required' });
-        // At this point the route is protected by signature middleware, so apiKey is valid and signed
+        // At this point the route is protected by API key middleware, so apiKey is valid
         const ttl = Number(req.body?.ttl) || 600; // seconds
         const { token, expires } = createSession(apiKey, ttl);
         return res.json({ token, expires });
