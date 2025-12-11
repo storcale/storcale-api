@@ -9,8 +9,7 @@ const querystring = require('node:querystring');
 app.use(express.json());
 global.__basedir = `${__dirname}`;
 
-// Rate limiter globals and banned IP storage (JSON file with metadata)
-const bannedIpsPath = path.join(__dirname, '/envs/banned_ips.json');
+const bannedIpsPath = path.join(__dirname, '/envs/banned_ips.env.json');
 function readBannedIps() {
     try {
         if (!fs.existsSync(bannedIpsPath)) return {};
@@ -78,7 +77,7 @@ const swaggerOptions = {
 const swaggerSpec = swaggerJSDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Admin UI routes (separate from protected API middleware)
+// Admin UI routes 
 try {
     const adminUi = require('./routes/admin-ui');
     app.use(adminUi);
@@ -117,7 +116,7 @@ function getRateLimitsForKey(key) {
     }
     return { windowSec: globalWindow, max: globalMax };
 }
-// Logger 
+// ? Logger 
 
 const logFilePath = path.join(__dirname, 'access.log');
 app.use((req, res, next) => {
@@ -157,7 +156,7 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
     if (!req.originalUrl.startsWith('/api/')) return next();
 
-    // determine apiKey for this request (logger middleware has its own scope)
+
     const apiKey = req.get('api-key') || req.query?.['api-key'] || 'none';
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     const identifier = apiKey && apiKey !== 'none' ? `key:${apiKey}` : `ip:${clientIp}`;
@@ -178,7 +177,6 @@ app.use((req, res, next) => {
     rateStore.set(identifier, recent);
 
     if (recent.length > limits.max) {
-        // Notify only when the excess reaches multiples of 10 (10,20,30...)
         const excess = recent.length - limits.max;
         try {
             if (excess > 0 && excess % 10 === 0) {
@@ -198,7 +196,7 @@ app.use((req, res, next) => {
 // Automatically load routes
 loadRoutes(app, path.join(__dirname, 'routes'), apiKeysJson);
 
-// Admin endpoints to inspect/reset rate counters (protected by API key)
+
 app.get('/api/admin/internal/rate-status', (req, res) => {
     const key = req.get('api-key') || req.query?.['api-key'];
     if (!key) return res.status(401).json({ error: 'API key required' });
