@@ -83,7 +83,7 @@ router.post('/', async (req, res) => {
         return res.status(403).json({ error: 'Webhook denied: files/attachments not allowed.' });
     }
 
-    // const hasPing = containsPing(body);
+    const hasPing = containsPing(body);
     const content = body.content || '';
     let keywords = process.env.KEYWORDS;
     if (typeof keywords === 'string') {
@@ -100,15 +100,15 @@ router.post('/', async (req, res) => {
     }
 
     const isDuplicate = lastWebhookContent === JSON.stringify(body);
-    /** 
-    if (!hasKeyword || isDuplicate) { // removed hasPing
+    
+    if (hasPing || !hasKeyword || isDuplicate) {
         if (isDuplicate) {
-            notifyDeniedWebhook( hasKeyword, isDuplicate, info) //removed hasPing
+            notifyDeniedWebhook(hasPing, hasKeyword, isDuplicate, info)
         }
         lastWebhookContent = JSON.stringify(body);
-        return res.status(403).json({ error: `Webhook denied. ${hasKeyword}  ${isDuplicate}` }); // removed hasPing
+        return res.status(403).json({ error: `Webhook denied. ${hasPing} ${hasKeyword}  ${isDuplicate}` });
     }
-*/
+        
 
     try {
         const target = process.env[query.target]

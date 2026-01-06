@@ -34,8 +34,9 @@ const rateStore = new Map(); // ip -> array of epoch seconds
 
 try {
     const dotenv = require('dotenv')
+    dotenv.config({ debug: process.env.DEBUG === 'true' });   
     dotenv.config({ path: path.join(__dirname, 'envs/.env') });
-    dotenv.config({ path: path.join(__dirname, 'envs/webhooks.env') });
+    dotenv.config({ path: path.join(__dirname, 'envs/webhook.env') });
     console.log('dotenv loaded');
 } catch (error) {
     console.error('Error loading .env:', error);
