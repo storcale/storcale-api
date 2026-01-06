@@ -100,7 +100,7 @@ router.post('/', async (req, res) => {
     }
 
     const isDuplicate = lastWebhookContent === JSON.stringify(body);
-    
+    /** 
     if (!hasKeyword || isDuplicate) { // removed hasPing
         if (isDuplicate) {
             notifyDeniedWebhook( hasKeyword, isDuplicate, info) //removed hasPing
@@ -108,7 +108,7 @@ router.post('/', async (req, res) => {
         lastWebhookContent = JSON.stringify(body);
         return res.status(403).json({ error: `Webhook denied. ${hasKeyword}  ${isDuplicate}` }); // removed hasPing
     }
-        
+*/
 
     try {
         const target = process.env[query.target]
