@@ -1,6 +1,7 @@
 
 const { google } = require('googleapis');
 const path = require('path');
+const fs = require('fs');
 const keyFile = path.join(global.__basedir, '/envs/gsaKey.env.json');
 const auth = new google.auth.GoogleAuth({
     keyFile: keyFile,
@@ -245,6 +246,11 @@ async function resetDB(settings, spreadsheetId) {
     } else {
         output += "N/A.\n";
     }
+    const logFile = path.join(global.__basedir, 'logs', `reset.log`);
+    const strikeUpdates = usersChanged.map(u => `${u.username} (${u.beforeStrikes} -> ${u.afterStrikes})`).join(', ');
+    const incompleteUsers = users.incomplete.map(u => u.username).join(', ');
+    const logLine = `[${new Date().toISOString()}] Reset performed on spreadsheet ID ${spreadsheetId} | Quota Period: ${expiryDate.toLocaleDateString('en-US')} -> ${today.toLocaleDateString('en-US')} | Incomplete: [${incompleteUsers || 'N/A'}] | Strikes Updated: [${strikeUpdates || 'N/A'}]`;
+    fs.appendFileSync(logFile, logLine + '\n');
     return output;
 }
 
