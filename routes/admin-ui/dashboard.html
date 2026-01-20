@@ -38,9 +38,35 @@
         <div id="panelLogs" class="w3-container" style="display:none; padding:12px;">
             <h3>Logs</h3>
             <div id="logsControls" class="w3-margin-bottom">
-                <label>Lines to load: <input id="logCount" type="number" value="200" style="width:80px"/></label>
-                <button id="reloadLogs" class="w3-button w3-small">Reload</button>
-                <button id="reloadServer" class="w3-button w3-small w3-orange">Reload server</button>
+                <div class="w3-row w3-margin-bottom">
+                    <div class="w3-col s6">
+                        <label>Lines to load: <input id="logCount" type="number" value="200" style="width:80px"/></label>
+                        <button id="reloadLogs" class="w3-button w3-small">Reload</button>
+                        <button id="reloadServer" class="w3-button w3-small w3-orange">Reload server</button>
+                    </div>
+                </div>
+                <div class="w3-row w3-margin-bottom">
+                    <div class="w3-col s12">
+                        <input id="logSearch" type="text" placeholder="Search keyword..." class="w3-input w3-margin-bottom" style="max-width:300px"/>
+                    </div>
+                </div>
+                <div class="w3-row w3-margin-bottom">
+                    <div class="w3-col s12">
+                        <label>Filter by method:</label>
+                        <div id="methodFilters" style="margin-top:8px;"></div>
+                    </div>
+                </div>
+                <div class="w3-row w3-margin-bottom">
+                    <div class="w3-col s12">
+                        <label>Sort by: 
+                            <select id="sortBy" class="w3-select" style="max-width:200px">
+                                <option value="recent">Most Recent</option>
+                                <option value="oldest">Oldest</option>
+                                <option value="method">Method (A-Z)</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
             </div>
             <div id="logsArea"></div>
         </div>
@@ -87,32 +113,117 @@
         document.getElementById('logout').addEventListener('click', async ()=>{ await fetch('/api/admin-ui/logout',{method:'POST'}); window.location.href='/admin-ui/login'; });
 
         // Logs rendering — readable list, admin lines highlighted
-            async function loadLogs() {
+        let allLogs = [];
+
+        function extractMethod(logLine) {
+            const match = logLine.match(/\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b/);
+            return match ? match[1] : 'OTHER';
+        }
+
+        function filterAndSortLogs() {
+            const searchTerm = document.getElementById('logSearch').value.toLowerCase();
+            const selectedMethods = Array.from(document.querySelectorAll('input[name="methodFilter"]:checked')).map(c => c.value);
+            const sortBy = document.getElementById('sortBy').value;
+
+            let filtered = allLogs.filter(line => {
+                // Keyword filter
+                if (searchTerm && !line.toLowerCase().includes(searchTerm)) {
+                    return false;
+                }
+                // Method filter
+                if (selectedMethods.length > 0) {
+                    const method = extractMethod(line);
+                    if (!selectedMethods.includes(method)) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            // Sort
+            if (sortBy === 'oldest') {
+                filtered = filtered.reverse();
+            } else if (sortBy === 'method') {
+                filtered.sort((a, b) => {
+                    const methodA = extractMethod(a);
+                    const methodB = extractMethod(b);
+                    return methodA.localeCompare(methodB);
+                });
+            }
+            // 'recent' is default (already reversed)
+
+            renderLogs(filtered);
+        }
+
+        function renderLogs(logs) {
+            const area = document.getElementById('logsArea');
+            const ul = document.createElement('ul');
+            ul.className = 'w3-ul w3-card-4 w3-hoverable';
+            
+            if (logs.length === 0) {
+                area.innerHTML = '<p class="w3-text-gray">No logs match your filters.</p>';
+                return;
+            }
+
+            logs.forEach(line => {
+                const li = document.createElement('li');
+                li.className = 'w3-padding-small log-item';
+                if (typeof line === 'string') {
+                    const pre = document.createElement('pre');
+                    pre.className = 'logline';
+                    pre.textContent = line;
+                    li.appendChild(pre);
+                    if (line.toLowerCase().includes('admin')) li.classList.add('admin');
+                } else {
+                    li.textContent = JSON.stringify(line);
+                }
+                ul.appendChild(li);
+            });
+            
+            area.innerHTML = '';
+            area.appendChild(ul);
+        }
+
+        async function loadLogs() {
             const n = Number(document.getElementById('logCount').value) || 200;
             const area = document.getElementById('logsArea');
             area.innerHTML = '<p>Loading logs...</p>';
             try {
-                    const res = await fetch(`/api/admin-ui/logs?n=${n}`, { credentials: 'same-origin' });
+                const res = await fetch(`/api/admin-ui/logs?n=${n}`, { credentials: 'same-origin' });
                 const j = await res.json();
-                if (!res.ok) { area.innerHTML = `<p class="w3-text-red">${j.error||'Failed to load'}</p>`; return; }
-                const ul = document.createElement('ul'); ul.className='w3-ul w3-card-4 w3-hoverable';
-                (j.logs||[]).slice().reverse().forEach(line=>{
-                    const li = document.createElement('li');
-                        li.className = 'w3-padding-small log-item';
+                if (!res.ok) { area.innerHTML = `<p class="w3-text-red">${j.error || 'Failed to load'}</p>`; return; }
+                
+                allLogs = (j.logs || []).slice().reverse();
+                
+                // Extract unique methods from logs
+                const methods = new Set();
+                allLogs.forEach(line => {
                     if (typeof line === 'string') {
-                        const pre = document.createElement('pre'); pre.className='logline'; pre.textContent = line;
-                        li.appendChild(pre);
-                        if (line.toLowerCase().includes('admin')) li.classList.add('admin');
-                    } else {
-                        li.textContent = JSON.stringify(line);
+                        methods.add(extractMethod(line));
                     }
-                    ul.appendChild(li);
                 });
-                area.innerHTML=''; area.appendChild(ul);
+                
+                // Populate method filters
+                const filterContainer = document.getElementById('methodFilters');
+                filterContainer.innerHTML = '';
+                Array.from(methods).sort().forEach(method => {
+                    const label = document.createElement('label');
+                    label.style.marginRight = '15px';
+                    label.innerHTML = `
+                        <input type="checkbox" name="methodFilter" value="${method}" checked/>
+                        ${method}
+                    `;
+                    filterContainer.appendChild(label);
+                    label.querySelector('input').addEventListener('change', filterAndSortLogs);
+                });
+                
+                filterAndSortLogs();
             } catch (e) { area.innerHTML = `<p class="w3-text-red">${e.message}</p>`; }
         }
 
         document.getElementById('reloadLogs').addEventListener('click', loadLogs);
+        document.getElementById('logSearch').addEventListener('input', filterAndSortLogs);
+        document.getElementById('sortBy').addEventListener('change', filterAndSortLogs);
 
         document.getElementById('reloadServer').addEventListener('click', async ()=>{
             if (!confirm('Run reload script on server? This may restart services.')) return;
