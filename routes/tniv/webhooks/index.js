@@ -7,6 +7,106 @@ const { error } = require('node:console');
 let lastWebhookContent = null;
 const { notifyDeniedWebhook } = require(path.join(global.__basedir, "utils/notify.js"))
 
+/**
+ * @swagger
+ * /tniv/webhooks:
+ *   post:
+ *     summary: Forward a Discord webhook to a configured target with security validation
+ *     tags:
+ *       - TNIV/Webhooks
+ *     parameters:
+ *       - in: query
+ *         name: target
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The target webhook code to forward to
+ *       - in: header
+ *         name: api-key
+ *         schema:
+ *           type: string
+ *         description: API key for authentication
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               content:
+ *                 type: string
+ *                 description: Message content
+ *               username:
+ *                 type: string
+ *                 description: Username to display
+ *               avatar_url:
+ *                 type: string
+ *                 description: Avatar URL
+ *               tts:
+ *                 type: boolean
+ *                 description: Text-to-speech
+ *               embeds:
+ *                 type: array
+ *                 description: Discord embeds
+ *               allowed_mentions:
+ *                 type: object
+ *                 description: Mentions configuration
+ *               components:
+ *                 type: array
+ *                 description: Message components
+ *               attachments:
+ *                 type: array
+ *                 description: Attachments
+ *               flags:
+ *                 type: integer
+ *                 description: Message flags
+ *               thread_name:
+ *                 type: string
+ *                 description: Thread name
+ *               thread_id:
+ *                 type: string
+ *                 description: Thread ID
+ *     responses:
+ *       200:
+ *         description: Webhook successfully forwarded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 body:
+ *                   type: string
+ *       400:
+ *         description: Invalid webhook payload or missing target
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *       403:
+ *         description: Webhook denied - contains pings, denied keywords, or is a duplicate
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *       500:
+ *         description: Failed to forward webhook
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                 details:
+ *                   type: string
+ */
+
 function cleanPayload(payload) {
     if (!payload || typeof payload !== "object") return {};
 
