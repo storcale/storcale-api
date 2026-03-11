@@ -6,7 +6,7 @@ const { SpreadsheetManager } = require(path.join(global.__basedir,'/utils/spread
 // routes
 /**
  * @swagger
- * /tniv/sheets/internal/addKey:
+ * /tniv/sheets/internal/key:
  *   put:
  *     summary: Add a spreadsheet key to a focus/category
  *     security:
@@ -54,7 +54,7 @@ const { SpreadsheetManager } = require(path.join(global.__basedir,'/utils/spread
  *       403:
  *         description: Invalid api-key for ressource
  */
-router.put('/addKey', async (req, res) => {
+router.put('/key', async (req, res) => {
     try {
         if (!req.body || !req.body.focus || !req.body.spreadsheetId) {
             return res.status(400).json({ error: 'Parameters invalid' });
@@ -68,7 +68,7 @@ router.put('/addKey', async (req, res) => {
 });
 /**
  * @swagger
- * /tniv/sheets/internal/removeKey:
+ * /tniv/sheets/internal/key:
  *   delete:
  *     summary: Remove a spreadsheet key from a focus/category
  *     security:
@@ -116,7 +116,7 @@ router.put('/addKey', async (req, res) => {
  *       403:
  *         description: Invalid api-key for ressource
  */
-router.delete('/removeKey', async (req, res) => {
+router.delete('/key', async (req, res) => {
     try {
         if (!req.body || !req.body.focus || !req.body.spreadsheetId) {
             return res.status(400).json({ error: 'Parameters invalid' });
@@ -130,7 +130,7 @@ router.delete('/removeKey', async (req, res) => {
 });
 /**
  * @swagger
- * /tniv/sheets/internal/updateKey:
+ * /tniv/sheets/internal/key:
  *   patch:
  *     summary: Update a spreadsheet key for a focus/category
 *     security:
@@ -178,7 +178,7 @@ router.delete('/removeKey', async (req, res) => {
  *       403:
  *         description: Invalid api-key for ressource
  */
-router.patch('/updateKey', async (req, res) => {
+router.patch('/key', async (req, res) => {
     try {
         if (!req.body || !req.body.focus || !req.body.spreadsheetId) {
             return res.status(400).json({ error: 'Parameters invalid' });
