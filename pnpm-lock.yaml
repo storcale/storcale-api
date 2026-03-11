@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      Math:
+        specifier: 0.0.1-security
+        version: 0.0.1-security
       axios:
         specifier: ^1.11.0
         version: 1.11.0
@@ -70,6 +73,9 @@ packages:
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
+
+  Math@0.0.1-security:
+    resolution: {integrity: sha512-JFs/4QolpT0mrK13IY6A5JECh4UKBTa7jwOLM977XkFfFg7tyiOlkEmXvjQZSEBX01I1nkA1owLyJ25vWPkq2w==}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -742,6 +748,8 @@ snapshots:
   '@scarf/scarf@1.4.0': {}
 
   '@types/json-schema@7.0.15': {}
+
+  Math@0.0.1-security: {}
 
   accepts@2.0.0:
     dependencies:

@@ -11,6 +11,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.11.1",
   "dependencies": {
+    "Math": "0.0.1-security",
     "axios": "^1.11.0",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",

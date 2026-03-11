@@ -28,6 +28,11 @@
  *           type: string
  *         description: Filter events up to this date (inclusive)
  *       - in: query
+ *         name: attendance
+ *         schema:
+ *           type: string
+ *         description: filter by attendanceCount
+ *       - in: query
  *         name: against
  *         schema:
  *           type: string
@@ -206,7 +211,7 @@ const router = express.Router();
 // Stats endpoint
 router.get('/stats', async (req, res) => {
     try {
-        const { type, eventType, from, since, to,until, username } = req.query;
+        const { type, eventType, from, since, to, until, username } = req.query;
 
         let dbInstance;
         switch (type) {
@@ -225,7 +230,7 @@ router.get('/stats', async (req, res) => {
             if (parts.length >= 3) {
                 const [month, day, year] = parts;
                 if (parts.length >= 6) {
-                        const { type, eventType, from, to, username } = req.query;
+                    const { type, eventType, from, to, username } = req.query;
                     return new Date(year, month - 1, day, hour || 0, min || 0, sec || 0);
                 }
                 return new Date(year, month - 1, day);
@@ -272,7 +277,7 @@ router.get('/stats', async (req, res) => {
                 stats: {
                     hostedCount: hostedEvents.length,
                     attendedCount: attendedEvents.length,
-                    MostHostedEventType
+                    MostHostedEventType,
                 }
             });
         }
@@ -285,6 +290,16 @@ router.get('/stats', async (req, res) => {
                 hostCounts[ev.username] = (hostCounts[ev.username] || 0) + 1;
             }
         });
+        let attendanceCount = 0
+        let bestAttendance = 0
+        events.forEach(ev => {
+            if (ev.attendance) {
+                let at = ev.attendance.split(',').length
+                if (at > bestAttendance) bestAttendance = at
+                attendanceCount += at
+            }
+        });
+        const averageAttendance = Math.round((attendanceCount / EventCount) * 100) / 100
         const TopHosts = Object.entries(hostCounts)
             .sort((a, b) => b[1] - a[1])
             .slice(0, 5)
@@ -342,10 +357,12 @@ router.get('/stats', async (req, res) => {
                     .slice(0, topN)
                     .map(([against, count]) => ({ against, count }));
                 if (topN === 1) {
-                    TopMap = TopMap; 
+                    TopMap = TopMap;
                     return res.json({
                         stats: {
                             EventCount,
+                            bestAttendance,
+                            averageAttendance,
                             TopHosts,
                             TopAttendees,
                             ...(TopMap ? { TopMap } : {}),
@@ -358,6 +375,8 @@ router.get('/stats', async (req, res) => {
                     return res.json({
                         stats: {
                             EventCount,
+                            bestAttendance,
+                            averageAttendance,
                             TopHosts,
                             TopAttendees,
                             ...(TopMap ? { TopMap } : {}),
@@ -373,6 +392,8 @@ router.get('/stats', async (req, res) => {
         return res.json({
             stats: {
                 EventCount,
+                bestAttendance,
+                averageAttendance,
                 TopHosts,
                 TopAttendees,
                 ...(TopMap ? { TopMap } : {}),
@@ -445,6 +466,19 @@ router.get('/', async (req, res) => {
                 return ok;
             });
         }
+        function parseAttendance(str) {
+            const parts = str.split(',');
+            return parts.length
+        }
+        const { attendance } = req.query
+        function filterByAttendance(events) {
+            return events.filter(ev => {
+                const d = parseAttendance(ev.attendance, attendance);
+                let ok = true;
+                if (d != attendance) ok = false
+                return ok;
+            });
+        }
 
         if (!type || type === '' || type === null || type === undefined) {
             let events = dbInstance.getEvents();
@@ -453,6 +487,9 @@ router.get('/', async (req, res) => {
             }
             if (from || since || to || until) {
                 events = filterByDate(events);
+            }
+            if (attendance) {
+                events = filterByAttendance(events)
             }
             return res.json({ main: events });
         } else {
