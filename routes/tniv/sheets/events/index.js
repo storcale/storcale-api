@@ -127,6 +127,10 @@
  *                   properties:
  *                     EventCount:
  *                       type: integer
+ *                     bestAttendance:
+ *                        type: integer
+ *                     averageAttendance:
+ *                        type: integer
  *                     TopHosts:
  *                       type: array
  *                       items:
