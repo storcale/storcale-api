@@ -2,7 +2,7 @@
  * @swagger
  * /tniv/DB/player/stats:
  *   get:
- *     summary: Get player stats, matches, and/or commands by userId.
+ *     summary: Get player stats by userId, or global match stats if no userId is provided.
  *     tags:
  *       - TNIV/DB/Player
  *     parameters:
@@ -10,18 +10,28 @@
  *         name: userId
  *         schema:
  *           type: string
- *         required: true
- *         description: The user ID to query.
+ *         required: false
+ *         description: The user ID to query. Omit for global stats.
  *       - in: query
  *         name: from
  *         schema:
  *           type: string
- *         description: Filter matches from this date (inclusive).
+ *         description: Filter matches from this date (inclusive). Alias since.
+ *       - in: query
+ *         name: since
+ *         schema:
+ *           type: string
+ *         description: Alias for from.
  *       - in: query
  *         name: to
  *         schema:
  *           type: string
- *         description: Filter matches up to this date (inclusive).
+ *         description: Filter matches up to this date (inclusive). Alias until.
+ *       - in: query
+ *         name: until
+ *         schema:
+ *           type: string
+ *         description: Alias for to.
  *       - in: query
  *         name: map
  *         schema:
@@ -38,16 +48,19 @@
  *         schema:
  *           type: string
  *           enum: [true, false]
- *         description: Include matches in response.
+ *         description: Include matches in response (only for per-user mode).
  *       - in: query
  *         name: commands
  *         schema:
  *           type: string
  *           enum: [true, false]
- *         description: Include commands in response.
+ *         description: Include commands in response (only for per-user mode).
  *     responses:
  *       200:
- *         description: Player stats, matches, and/or commands.
+ *         description: >
+ *           Per-user stats (userId provided) or global stats (no userId).
+ *           Global stats include MatchCount, TotalKills, TotalDeaths, AveragePing,
+ *           TopKillers, TopDeaths, TopKD, TopPlayTime, and TopMaps.
  *         content:
  *           application/json:
  *             schema:
@@ -55,13 +68,6 @@
  *               properties:
  *                 stats:
  *                   type: object
- *                   properties:
- *                     Ping:
- *                       type: integer
- *                     Kills:
- *                       type: integer
- *                     Deaths:
- *                       type: integer
  *                 matches:
  *                   type: array
  *                   items:
@@ -87,80 +93,198 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
-const matches = path.join(__dirname, '../../match/matches.log');
+const matchesLogPath = path.join(__dirname, '../../match/matches.log');
 
+function parseDate(str) {
+    if (!str) return null;
+    if (!isNaN(str)) {
+        let num = Number(str);
+        if (num > 1000000000 && num < 2000000000) return new Date(num * 1000);
+        return new Date(num);
+    }
+    const parts = str.split(/[\/ :]/);
+    if (parts.length >= 6) {
+        const [month, day, year, hour, min, sec] = parts;
+        return new Date(year, month - 1, day, hour || 0, min || 0, sec || 0);
+    }
+    if (parts.length >= 3) {
+        const [month, day, year] = parts;
+        return new Date(year, month - 1, day);
+    }
+    return new Date(str);
+}
+
+function loadFilteredMatches(from, since, to, until, map) {
+    if (!fs.existsSync(matchesLogPath)) return [];
+    const lines = fs.readFileSync(matchesLogPath, 'utf8').split('\n').filter(Boolean);
+    const result = [];
+    const dateFrom = from || since;
+    const dateTo = to || until;
+    for (const line of lines) {
+        let obj;
+        try { obj = JSON.parse(line); } catch { continue; }
+        if (map && obj.placeName && !obj.placeName.includes(map)) continue;
+        if (dateFrom || dateTo) {
+            const d = parseDate(obj.date || obj.timestamp || obj.startTime);
+            if (dateFrom && d < parseDate(dateFrom)) continue;
+            if (dateTo && d > parseDate(dateTo)) continue;
+        }
+        result.push(obj);
+    }
+    return result;
+}
+
+// ─── Global stats (no userId) ────────────────────────────────────────────────
+function buildGlobalStats(matchObjs) {
+    const killMap = {};
+    const deathMap = {};
+    const playTimeMap = {};
+    const mapCounts = {};
+    let totalPing = 0, pingCount = 0;
+    let totalKills = 0, totalDeaths = 0;
+
+    for (const obj of matchObjs) {
+        // Map popularity
+        if (obj.placeName) {
+            mapCounts[obj.placeName] = (mapCounts[obj.placeName] || 0) + 1;
+        }
+
+        // Leaderstats per player
+        if (obj.leaderstats) {
+            for (const [uid, ls] of Object.entries(obj.leaderstats)) {
+                const kills = ls.Kills || 0;
+                const deaths = ls.Deaths || 0;
+                killMap[uid] = (killMap[uid] || 0) + kills;
+                deathMap[uid] = (deathMap[uid] || 0) + deaths;
+                totalKills += kills;
+                totalDeaths += deaths;
+                if (typeof ls.Ping === 'number') {
+                    totalPing += ls.Ping;
+                    pingCount++;
+                }
+            }
+        }
+
+        // Play time per player
+        if (obj.playTimeList) {
+            for (const [uid, pt] of Object.entries(obj.playTimeList)) {
+                const time = (typeof pt.defenders === 'number' ? pt.defenders : 0)
+                    + (typeof pt.attackers === 'number' ? pt.attackers : 0);
+                playTimeMap[uid] = (playTimeMap[uid] || 0) + time;
+            }
+        }
+    }
+
+    const topN = (map, valueKey) =>
+        Object.entries(map)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([userId, v]) => ({ userId, [valueKey]: v }));
+
+    const TopKillers = topN(killMap, 'kills');
+    const TopDeaths = topN(deathMap, 'deaths');
+    const TopPlayTime = Object.entries(playTimeMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([userId, secs]) => ({ userId, playTime: Math.round(secs / 60) }));
+
+    // Top K/D (min 1 kill to appear)
+    const allUids = new Set([...Object.keys(killMap), ...Object.keys(deathMap)]);
+    const TopKD = Array.from(allUids)
+        .filter(uid => (killMap[uid] || 0) >= 1)
+        .map(uid => ({
+            userId: uid,
+            kills: killMap[uid] || 0,
+            deaths: deathMap[uid] || 0,
+            kd: deathMap[uid] > 0
+                ? Math.round((killMap[uid] / deathMap[uid]) * 100) / 100
+                : killMap[uid] || 0
+        }))
+        .sort((a, b) => b.kd - a.kd)
+        .slice(0, 5);
+
+    const TopMaps = Object.entries(mapCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([map, count]) => ({ map, count }));
+
+    return {
+        MatchCount: matchObjs.length,
+        TotalKills: totalKills,
+        TotalDeaths: totalDeaths,
+        AveragePing: pingCount > 0 ? Math.round(totalPing / pingCount) : 0,
+        TopKillers,
+        TopDeaths,
+        TopKD,
+        TopPlayTime,
+        TopMaps,
+    };
+}
+
+// ─── Per-user stats ───────────────────────────────────────────────────────────
+function buildUserStats(userId, matchObjs) {
+    let stats = { Ping: 0, Kills: 0, Deaths: 0 };
+    let pingCount = 0;
+    let totalPlayTime = 0;
+    const commands = [];
+
+    for (const obj of matchObjs) {
+        if (obj.leaderstats) {
+            for (const key of Object.keys(obj.leaderstats)) {
+                if (String(key) === String(userId)) {
+                    if (typeof obj.leaderstats[key].Ping === 'number') {
+                        stats.Ping += obj.leaderstats[key].Ping;
+                        pingCount++;
+                    }
+                    stats.Kills += obj.leaderstats[key].Kills || 0;
+                    stats.Deaths += obj.leaderstats[key].Deaths || 0;
+                }
+            }
+        }
+        if (obj.playTimeList && obj.playTimeList[userId]) {
+            const pt = obj.playTimeList[userId];
+            if (typeof pt.defenders === 'number') totalPlayTime += pt.defenders;
+            if (typeof pt.attackers === 'number') totalPlayTime += pt.attackers;
+        }
+        if (Array.isArray(obj.logs)) {
+            commands.push(...obj.logs.filter(l => String(l.userId) === String(userId)));
+        }
+    }
+
+    if (pingCount > 0) stats.Ping = Math.round(stats.Ping / pingCount);
+    stats.playTime = Math.round(totalPlayTime / 60);
+    stats.KD = stats.Deaths > 0
+        ? Math.round((stats.Kills / stats.Deaths) * 100) / 100
+        : stats.Kills;
+
+    return { stats, commands };
+}
+
+// ─── Route ────────────────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
     try {
-        const { userId, from, to, map } = req.query;
-        function parseDate(str) {
-            if (!str) return null;
-            if (!isNaN(str)) {
-                let num = Number(str);
-                if (num > 1000000000 && num < 2000000000) {
-                    return new Date(num * 1000);
-                }
-                return new Date(num);
-            }
-            const parts = str.split(/[\/ :]/);
-            if (parts.length >= 3) {
-                const [month, day, year] = parts;
-                if (parts.length >= 6) {
-                    const [month, day, year, hour, min, sec] = parts;
-                    return new Date(year, month - 1, day, hour || 0, min || 0, sec || 0);
-                }
-                return new Date(year, month - 1, day);
-            }
-            return new Date(str);
-        }
-
-        let stats = { Ping: 0, Kills: 0, Deaths: 0 };
-        let pingCount = 0;
-        let totalPlayTime = 0;
-        let matchesArr = [];
-        let commands = [];
-        if (fs.existsSync(matches)) {
-            const lines = fs.readFileSync(matches, 'utf8').split('\n').filter(Boolean);
-            for (const line of lines) {
-                let obj;
-                try { obj = JSON.parse(line); } catch { continue; }
-                if (map && obj.placeName && !obj.placeName.includes(map)) continue;
-                if (from || to) {
-                    const d = parseDate(obj.date || obj.timestamp || obj.startTime);
-                    if (from && d < parseDate(from)) continue;
-                    if (to && d > parseDate(to)) continue;
-                }
-                if (obj.leaderstats) {
-                    for (const key of Object.keys(obj.leaderstats)) {
-                        if (String(key) === String(userId)) {
-                            if (typeof obj.leaderstats[key].Ping === 'number') {
-                                stats.Ping += obj.leaderstats[key].Ping;
-                                pingCount++;
-                            }
-                            stats.Kills += obj.leaderstats[key].Kills || 0;
-                            stats.Deaths += obj.leaderstats[key].Deaths || 0;
-                        }
-                    }
-                }
-                if (obj.playTimeList && obj.playTimeList[userId]) {
-                    const pt = obj.playTimeList[userId];
-                    if (typeof pt.defenders === 'number') totalPlayTime += pt.defenders;
-                    if (typeof pt.attackers === 'number') totalPlayTime += pt.attackers;
-                }
-                matchesArr.push(obj);
-                if (Array.isArray(obj.logs)) {
-                    commands.push(...obj.logs.filter(l => String(l.userId) === String(userId)));
-                }
-            }
-        }
-        if (pingCount > 0) stats.Ping = Math.round(stats.Ping / pingCount);
-        stats.playTime = Math.round(totalPlayTime / 60);
-
+        const { userId, from, since, to, until, map } = req.query;
         const { stats: ifStats, matches: ifMatches, commands: ifCommands } = req.query;
+
+        const matchObjs = loadFilteredMatches(from, since, to, until, map);
+
+        // ── Global mode (no userId) ──────────────────────────────────────────
+        if (!userId) {
+            const globalStats = buildGlobalStats(matchObjs);
+            const response = {};
+            if (ifStats !== 'false') response.stats = globalStats;
+            if (ifMatches === 'true') response.matches = matchObjs;
+            return res.json(response);
+        }
+
+        // ── Per-user mode ────────────────────────────────────────────────────
+        const { stats, commands } = buildUserStats(userId, matchObjs);
         const response = {};
         if (ifStats !== 'false') response.stats = stats;
-        if (ifMatches === 'true' || req.query.matches === 'true') response.matches = matchesArr;
-        if (ifCommands === 'true' || req.query.commands === 'true') response.commands = commands;
+        if (ifMatches === 'true') response.matches = matchObjs;
+        if (ifCommands === 'true') response.commands = commands;
         return res.json(response);
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
