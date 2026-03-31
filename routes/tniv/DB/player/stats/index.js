@@ -33,15 +33,15 @@
  *           type: string
  *         description: Alias for to.
  *       - in: query
+ *         name: minKillsKD
+ *         schema:
+ *           type: number
+ *         description: Minimum kills to be shown in top KD (default 1)
+ *       - in: query
  *         name: map
  *         schema:
  *           type: string
  *         description: Filter matches by map name (partial match).
- *       - in: query
- *         name: stats
- *         schema:
- *           type: string
- *           enum: [true, false]
  *         description: Include stats in response (default true).
  *       - in: query
  *         name: matches
@@ -120,44 +120,52 @@ function loadFilteredMatches(from, since, to, until, map) {
     const result = [];
     const dateFrom = from || since;
     const dateTo = to || until;
+
     for (const line of lines) {
         let obj;
         try { obj = JSON.parse(line); } catch { continue; }
+
         if (map && obj.placeName && !obj.placeName.includes(map)) continue;
+
         if (dateFrom || dateTo) {
             const d = parseDate(obj.date || obj.timestamp || obj.startTime);
             if (dateFrom && d < parseDate(dateFrom)) continue;
             if (dateTo && d > parseDate(dateTo)) continue;
         }
+
         result.push(obj);
     }
+
     return result;
 }
 
-// ─── Global stats (no userId) ────────────────────────────────────────────────
-function buildGlobalStats(matchObjs) {
+function buildGlobalStats(matchObjs, minKills) {
+    minKills = Number(minKills) || 1;
+
     const killMap = {};
     const deathMap = {};
     const playTimeMap = {};
     const mapCounts = {};
+
     let totalPing = 0, pingCount = 0;
     let totalKills = 0, totalDeaths = 0;
 
     for (const obj of matchObjs) {
-        // Map popularity
         if (obj.placeName) {
             mapCounts[obj.placeName] = (mapCounts[obj.placeName] || 0) + 1;
         }
 
-        // Leaderstats per player
         if (obj.leaderstats) {
             for (const [uid, ls] of Object.entries(obj.leaderstats)) {
                 const kills = ls.Kills || 0;
                 const deaths = ls.Deaths || 0;
+
                 killMap[uid] = (killMap[uid] || 0) + kills;
                 deathMap[uid] = (deathMap[uid] || 0) + deaths;
+
                 totalKills += kills;
                 totalDeaths += deaths;
+
                 if (typeof ls.Ping === 'number') {
                     totalPing += ls.Ping;
                     pingCount++;
@@ -165,40 +173,41 @@ function buildGlobalStats(matchObjs) {
             }
         }
 
-        // Play time per player
         if (obj.playTimeList) {
             for (const [uid, pt] of Object.entries(obj.playTimeList)) {
                 const time = (typeof pt.defenders === 'number' ? pt.defenders : 0)
                     + (typeof pt.attackers === 'number' ? pt.attackers : 0);
+
                 playTimeMap[uid] = (playTimeMap[uid] || 0) + time;
             }
         }
     }
 
-    const topN = (map, valueKey) =>
+    const topN = (map, key) =>
         Object.entries(map)
             .sort((a, b) => b[1] - a[1])
             .slice(0, 5)
-            .map(([userId, v]) => ({ userId, [valueKey]: v }));
+            .map(([userId, v]) => ({ userId, [key]: v }));
 
     const TopKillers = topN(killMap, 'kills');
     const TopDeaths = topN(deathMap, 'deaths');
+
     const TopPlayTime = Object.entries(playTimeMap)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
         .map(([userId, secs]) => ({ userId, playTime: Math.round(secs / 60) }));
 
-    // Top K/D (min 1 kill to appear)
     const allUids = new Set([...Object.keys(killMap), ...Object.keys(deathMap)]);
+
     const TopKD = Array.from(allUids)
-        .filter(uid => (killMap[uid] || 0) >= 1)
+        .filter(uid => (killMap[uid] || 0) >= minKills)
         .map(uid => ({
             userId: uid,
             kills: killMap[uid] || 0,
             deaths: deathMap[uid] || 0,
             kd: deathMap[uid] > 0
                 ? Math.round((killMap[uid] / deathMap[uid]) * 100) / 100
-                : killMap[uid] || 0
+                : (killMap[uid] || 0)
         }))
         .sort((a, b) => b.kd - a.kd)
         .slice(0, 5);
@@ -217,11 +226,10 @@ function buildGlobalStats(matchObjs) {
         TopDeaths,
         TopKD,
         TopPlayTime,
-        TopMaps,
+        TopMaps
     };
 }
 
-// ─── Per-user stats ───────────────────────────────────────────────────────────
 function buildUserStats(userId, matchObjs) {
     let stats = { Ping: 0, Kills: 0, Deaths: 0 };
     let pingCount = 0;
@@ -229,29 +237,31 @@ function buildUserStats(userId, matchObjs) {
     const commands = [];
 
     for (const obj of matchObjs) {
-        if (obj.leaderstats) {
-            for (const key of Object.keys(obj.leaderstats)) {
-                if (String(key) === String(userId)) {
-                    if (typeof obj.leaderstats[key].Ping === 'number') {
-                        stats.Ping += obj.leaderstats[key].Ping;
-                        pingCount++;
-                    }
-                    stats.Kills += obj.leaderstats[key].Kills || 0;
-                    stats.Deaths += obj.leaderstats[key].Deaths || 0;
-                }
+        if (obj.leaderstats && obj.leaderstats[userId]) {
+            const ls = obj.leaderstats[userId];
+
+            if (typeof ls.Ping === 'number') {
+                stats.Ping += ls.Ping;
+                pingCount++;
             }
+
+            stats.Kills += ls.Kills || 0;
+            stats.Deaths += ls.Deaths || 0;
         }
+
         if (obj.playTimeList && obj.playTimeList[userId]) {
             const pt = obj.playTimeList[userId];
             if (typeof pt.defenders === 'number') totalPlayTime += pt.defenders;
             if (typeof pt.attackers === 'number') totalPlayTime += pt.attackers;
         }
+
         if (Array.isArray(obj.logs)) {
             commands.push(...obj.logs.filter(l => String(l.userId) === String(userId)));
         }
     }
 
     if (pingCount > 0) stats.Ping = Math.round(stats.Ping / pingCount);
+
     stats.playTime = Math.round(totalPlayTime / 60);
     stats.KD = stats.Deaths > 0
         ? Math.round((stats.Kills / stats.Deaths) * 100) / 100
@@ -260,29 +270,29 @@ function buildUserStats(userId, matchObjs) {
     return { stats, commands };
 }
 
-// ─── Route ────────────────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
     try {
-        const { userId, from, since, to, until, map } = req.query;
-        const { stats: ifStats, matches: ifMatches, commands: ifCommands } = req.query;
+        const { userId, from, since, to, until, map, minKillsKD } = req.query;
+        const { matches: ifMatches, commands: ifCommands } = req.query;
 
         const matchObjs = loadFilteredMatches(from, since, to, until, map);
 
-        // ── Global mode (no userId) ──────────────────────────────────────────
         if (!userId) {
-            const globalStats = buildGlobalStats(matchObjs);
-            const response = {};
-            if (ifStats !== 'false') response.stats = globalStats;
+            const stats = buildGlobalStats(matchObjs, minKillsKD);
+            const response = { stats };
+
             if (ifMatches === 'true') response.matches = matchObjs;
+
             return res.json(response);
         }
 
-        // ── Per-user mode ────────────────────────────────────────────────────
         const { stats, commands } = buildUserStats(userId, matchObjs);
-        const response = {};
-        if (ifStats !== 'false') response.stats = stats;
+
+        const response = { stats };
+
         if (ifMatches === 'true') response.matches = matchObjs;
         if (ifCommands === 'true') response.commands = commands;
+
         return res.json(response);
 
     } catch (err) {
