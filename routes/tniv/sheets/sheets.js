@@ -182,7 +182,7 @@ async function getRosterData(settings, spreadsheetId) {
         return result;
     }, []);
 }
-async function resetDB(settings, spreadsheetId) {
+async function resetDB(settings, spreadsheetId,focusName) {
     const client = await auth.getClient();
     const sheets = google.sheets({ version: 'v4', auth: client });
     const range = `${settings.settingsSheetName}!${settings.dateField}`;
@@ -229,8 +229,9 @@ async function resetDB(settings, spreadsheetId) {
             values: [[today.toLocaleDateString('en-US')]],
         },
     });
-
-    let output = "**Users with incomplete quota:**\n";
+    console.log(focusName)
+    let output = "# [Database Reset](https://docs.google.com/spreadsheets/d/"+spreadsheetId+") for " + focusName + "\n\n";
+    output += "**Users with incomplete quota:**\n";
     if (Array.isArray(users?.incomplete)) {
         users.incomplete.forEach(user => {
             output += `- ${user.username} (Points: ${user.points}, Strikes: ${user.strikes})\n`;

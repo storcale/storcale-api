@@ -59,7 +59,8 @@ router.post('/reset', async (req, res) => {
         if (!focus) return res.status(400).json({ error: 'Invalid params' });
         const id = new SpreadsheetManager().getSpreadsheet(focus);
         const settings = await loadSettings(id);
-        const data = await resetDB(settings, id);
+        console.log(focus)
+        const data = await resetDB(settings, id,focus);
         res.json({ body: data });
     } catch (err) {
         res.status(500).json({ error: err.message });
