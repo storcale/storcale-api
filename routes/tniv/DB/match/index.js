@@ -122,26 +122,24 @@ router.get('/', (req, res) => {
     const lines = data
       .split('\n')
       .filter((line) => line.trim() !== '');
-      
-    const matches = lines || []
-    if(sessionId){
-      const filtered = sessionId
-      ? lines.filter((line) => line.includes(sessionId))
-      : lines;
-    const matches = filtered
-      .map((line) => {
-        try { return JSON.parse(line); } catch { return null; }
-      })
-      .filter((x) => x !== null);
-    }else{
-      const matches = lines
-      .map((line) => {
-        try { return JSON.parse(line); } catch { return null; }
-      })
-      .filter((x) => x !== null);
+
+    let matches;
+    if (sessionId) {
+      const filtered = lines.filter((line) => line.includes(sessionId));
+      matches = filtered
+        .map((line) => {
+          try { return JSON.parse(line); } catch { return null; }
+        })
+        .filter((x) => x !== null);
+    } else {
+      matches = lines
+        .map((line) => {
+          try { return JSON.parse(line); } catch { return null; }
+        })
+        .filter((x) => x !== null);
     }
-    const filterMatches = matches || []
-    return res.status(200).json({ body: filterMatches });
+
+    return res.status(200).json({ body: matches });
   });
 });
 
