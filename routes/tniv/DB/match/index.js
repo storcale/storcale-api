@@ -46,18 +46,30 @@ const logFilePath = path.join(__dirname, 'matches.log');
  *       500:
  *         description: Server error
  */
+const { sendMatchWebhook } = require(path.join(global.__basedir, 'utils/matchWebhook.js'));
+
 router.post('/', (req, res) => {
-  const matchData = req.body;
-  if (!matchData || !matchData.sessionId) {
-    return res.status(400).json({ error: 'Invalid match data' });
-  }
-  fs.appendFile(logFilePath, JSON.stringify(matchData) + '\n', (err) => {
-    if (err) {
-      console.error('Error writing to log file:', err);
-      return res.status(500).json({ error: 'Internal server error' });
+    const matchData = req.body;
+    if (!matchData || !matchData.sessionId) {
+        return res.status(400).json({ error: 'Invalid match data' });
     }
-    return res.status(200).json({ body: 'Logged!' });
-  });
+
+    fs.appendFile(logFilePath, JSON.stringify(matchData) + '\n', async (err) => {
+        if (err) {
+            console.error('Error writing to log file:', err);
+            return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        if (matchData.sendWebhook) {
+            sendMatchWebhook(matchData, {
+                baseUrl: 'https://storcale-api.omegadev.xyz',
+                target:  process.env.MatchLogWebhookTarget,  
+                apiKey:  process.env.ADMIN_KEY,
+            }).catch(e => console.error('[matchWebhook] Failed:', e?.response?.data || e?.message));
+        }
+
+        return res.status(200).json({ body: 'Logged!' });
+    });
 });
 
 /**
