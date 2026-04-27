@@ -114,6 +114,70 @@ function parseDate(str) {
     return new Date(str);
 }
 
+function parseVersion(v) {
+    if (!v) return [0, 0, 0];
+    return String(v).replace(/^v/, '').split('.').map(Number);
+}
+
+function versionAtLeast(v, major, minor, patch = 0) {
+    const [ma, mi, pa] = parseVersion(v);
+    if (ma !== major) return ma > major;
+    if (mi !== minor) return mi > minor;
+    return pa >= patch;
+}
+
+function normalizeMatch(obj) {
+    // Old format — no terminalVersion, already has leaderstats/playTimeList
+    if (!versionAtLeast(obj.terminalVersion, 2, 0, 0)) {
+        return obj;
+    }
+
+    // New format (>= 2.0.0) — player lists with statistics arrays
+    const leaderstats = {};
+    const playTimeList = {};
+
+    const allPlayers = [
+        ...(obj.defendersPlayerList || []),
+        ...(obj.attackersPlayerList || []),
+    ];
+
+    for (const player of allPlayers) {
+        const uid = String(player.userId);
+
+        const statsObj = {};
+        for (const stat of (player.statistics || [])) {
+            statsObj[stat.name] = stat.value;
+        }
+
+        leaderstats[uid] = {
+            Kills:  statsObj.Kills  || 0,
+            Deaths: statsObj.Deaths || 0,
+            Ping:   statsObj.Ping   || 0,
+        };
+
+        // Playtime is a single total in new format
+        playTimeList[uid] = {
+            defenders: player.Playtime || 0,
+            attackers: 0,
+        };
+    }
+
+    // New format logs already carry userId directly as a number — normalise to string
+    const logs = (obj.logs || []).map(log => ({
+        ...log,
+        userId: log.userId != null ? String(log.userId) : null,
+    }));
+
+    return {
+        ...obj,
+        placeName:    obj.gameName,
+        leaderstats,
+        playTimeList,
+        logs,
+        date: obj.matchStartTime ?? obj.date,
+    };
+}
+
 function loadFilteredMatches(from, since, to, until, map) {
     if (!fs.existsSync(matchesLogPath)) return [];
     const lines = fs.readFileSync(matchesLogPath, 'utf8').split('\n').filter(Boolean);
@@ -124,6 +188,8 @@ function loadFilteredMatches(from, since, to, until, map) {
     for (const line of lines) {
         let obj;
         try { obj = JSON.parse(line); } catch { continue; }
+
+        obj = normalizeMatch(obj);
 
         if (map && obj.placeName && !obj.placeName.includes(map)) continue;
 
