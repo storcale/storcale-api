@@ -194,12 +194,18 @@ function loadFilteredMatches(from, since, to, until, map) {
         if (map && obj.placeName && !obj.placeName.includes(map)) continue;
 
         if (dateFrom || dateTo) {
-            const d = parseDate(obj.date || obj.timestamp || obj.startTime);
+            // matchStartTime is Unix timestamp in seconds, others are date strings
+            let d = null;
+            if (obj.matchStartTime) {
+                d = new Date(obj.matchStartTime * 1000); // convert seconds to ms
+            } else {
+                d = parseDate(obj.date || obj.timestamp || obj.startTime);
+            }
             const fromDate = parseDate(dateFrom);
             const toDate = parseDate(dateTo);
 
-            if (dateFrom && fromDate && !isNaN(fromDate.getTime()) && d < fromDate) continue;
-            if (dateTo && toDate && !isNaN(toDate.getTime()) && d > toDate) continue;
+            if (dateFrom && fromDate && !isNaN(fromDate.getTime()) && d && d < fromDate) continue;
+            if (dateTo && toDate && !isNaN(toDate.getTime()) && d && d > toDate) continue;
         }
 
         result.push(obj);
