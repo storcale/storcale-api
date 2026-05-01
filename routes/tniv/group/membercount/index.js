@@ -11,7 +11,9 @@ async function getGroupMemberCount(groupId, month, year) {
     const targetMonth = parseInt(month, 10);
     const targetYear = parseInt(year, 10);
 
-
+    if (!groupId) {
+            throw new Error('Group ID is required.');
+    }
     if (targetMonth < 1 || targetMonth > 12) {
         throw new Error('Invalid month. Must be between 1 and 12.');
     }
@@ -36,9 +38,7 @@ async function getGroupMemberCount(groupId, month, year) {
             throw new Error('No data found for the specified month and group.');
         }
     } else {
-        if (!groupId) {
-            throw new Error('Group ID is required.');
-        }
+        
         let response;
         try {
             response = await axios.get(url + groupId, {
