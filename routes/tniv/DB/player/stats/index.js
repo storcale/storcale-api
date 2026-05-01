@@ -195,8 +195,11 @@ function loadFilteredMatches(from, since, to, until, map) {
 
         if (dateFrom || dateTo) {
             const d = parseDate(obj.date || obj.timestamp || obj.startTime);
-            if (dateFrom && d < parseDate(dateFrom)) continue;
-            if (dateTo && d > parseDate(dateTo)) continue;
+            const fromDate = parseDate(dateFrom);
+            const toDate = parseDate(dateTo);
+
+            if (dateFrom && fromDate && !isNaN(fromDate.getTime()) && d < fromDate) continue;
+            if (dateTo && toDate && !isNaN(toDate.getTime()) && d > toDate) continue;
         }
 
         result.push(obj);
