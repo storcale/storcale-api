@@ -3,3 +3,4 @@ node_modules
 *.log
 /routes/admin/notify
 utils/signature.js
+store.json

@@ -34,7 +34,6 @@ const rateStore = new Map(); // ip -> array of epoch seconds
 
 try {
     const dotenv = require('dotenv')
-    dotenv.config({ debug: process.env.DEBUG === 'true' });   
     dotenv.config({ path: path.join(__dirname, 'envs/.env') });
     dotenv.config({ path: path.join(__dirname, 'envs/webhook.env') });
     console.log('dotenv loaded');
@@ -164,7 +163,7 @@ app.use((req, res, next) => {
 
     const bans = readBannedIps();
     if (bans[clientIp]) {
-        res.status(403).json({ error: 'Your IP is banned.' });
+        res.status(403).json({ error: 'You are banned.' });
         return;
     }
 
