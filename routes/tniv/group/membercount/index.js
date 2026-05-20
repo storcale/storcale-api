@@ -4,41 +4,40 @@ const router = express.Router();
 const storePath = path.join(__dirname, 'store.json'); // Store to follow data across time
 const axios = require('axios');
 const fs = require('fs');
+
+function parsePositiveInt(value, fallback) {
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function parseBoolean(value) {
+    if (value === undefined || value === null) return false;
+    const normalized = String(value).trim().toLowerCase();
+    return ['1', 'true', 'yes', 'on'].includes(normalized);
+}
+
 async function getGroupMemberCount(groupId, month, year) {
     const url = `https://groups.roblox.com/v1/groups/`;
     const date = new Date();
     const currentMonth = date.getMonth() + 1;
-    const targetMonth = parseInt(month, 10);
-    const targetYear = parseInt(year, 10);
+    const currentYear = date.getFullYear();
+    const targetMonth = parsePositiveInt(month, currentMonth);
+    const targetYear = parsePositiveInt(year, currentYear);
 
     if (!groupId) {
-            throw new Error('Group ID is required.');
+        throw new Error('Group ID is required.');
     }
     if (targetMonth < 1 || targetMonth > 12) {
         throw new Error('Invalid month. Must be between 1 and 12.');
     }
-    if (targetMonth !== currentMonth && targetMonth < currentMonth - 1 && targetYear <= date.getFullYear()) {
-        const logData = fs.readFileSync(storePath, 'utf-8');
-        const entries = logData.split('\n').filter(line => line.trim() !== '');
-        let lastEntry = null;
-        for (const entry of entries) {
-            try {
-                const data = JSON.parse(entry);
-                if (data.groupId === groupId && data.month === targetMonth && data.year === targetYear) {
-                    lastEntry = data;
-                }
-            } catch (err) {
-                console.error('Error parsing log entry:', err);
-            }
+    if (targetYear < 1970 || targetYear > 9999) {
+        throw new Error('Invalid year.');
+    }
+    if (targetYear > currentYear || (targetYear === currentYear && targetMonth > currentMonth)) {
+        throw new Error('Cannot request member count for a future month.');
+    }
 
-        }
-        if (lastEntry) {
-            return lastEntry.memberCount;
-        } else {
-            throw new Error('No data found for the specified month and group.');
-        }
-    } else {
-        
+    if (targetMonth === currentMonth && targetYear === currentYear) {
         let response;
         try {
             response = await axios.get(url + groupId, {
@@ -54,30 +53,77 @@ async function getGroupMemberCount(groupId, month, year) {
             throw new Error('Request failed with roblox opencloud API. Error code: ' + response.status);
         }
 
-        let result = response.data.memberCount;
-        // Store the result 
-        let logEntry = {
+        const result = response.data.memberCount;
+        const logEntry = {
             groupId,
             month: targetMonth,
             year: targetYear,
             memberCount: result,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         };
         try {
             fs.appendFileSync(storePath, JSON.stringify(logEntry) + '\n');
         } catch (err) {
             console.error('Failed to write to store:', err);
         }
-        return result
+        return result;
     }
 
+    const logData = fs.readFileSync(storePath, 'utf-8');
+    const entries = logData.split('\n').filter(line => line.trim() !== '');
+    let lastEntry = null;
+    for (const entry of entries) {
+        try {
+            const data = JSON.parse(entry);
+            if (data.groupId === groupId && data.month === targetMonth && data.year === targetYear) {
+                lastEntry = data;
+            }
+        } catch (err) {
+            console.error('Error parsing log entry:', err);
+        }
+    }
+    if (lastEntry) {
+        return lastEntry.memberCount;
+    }
+    throw new Error('No data found for the specified month and group.');
+}
+
+async function getGroupMemberGrowth(groupId, fromMonth, fromYear, toMonth, toYear) {
+    const date = new Date();
+    const currentMonth = date.getMonth() + 1;
+    const currentYear = date.getFullYear();
+
+    const startMonth = parsePositiveInt(fromMonth, null);
+    if (startMonth === null) {
+        throw new Error('fromMonth is required for growth queries.');
+    }
+
+    const startYear = parsePositiveInt(fromYear, currentYear);
+    const endMonth = parsePositiveInt(toMonth, currentMonth);
+    const endYear = parsePositiveInt(toYear, currentYear);
+
+    const fromMemberCount = await getGroupMemberCount(groupId, startMonth, startYear);
+    const toMemberCount = await getGroupMemberCount(groupId, endMonth, endYear);
+    const growth = toMemberCount - fromMemberCount;
+    const growthPercent = fromMemberCount === 0 ? null : Number(((growth / Math.abs(fromMemberCount)) * 100).toFixed(2));
+
+    return {
+        fromMonth: startMonth,
+        fromYear: startYear,
+        fromMemberCount,
+        toMonth: endMonth,
+        toYear: endYear,
+        toMemberCount,
+        growth,
+        growthPercent,
+    };
 }
 
 /**
  * @swagger
  * /tniv/group/memberCount:
  *   get:
- *     summary: Get a group's member count for a specific month and year or the current one.
+ *     summary: Get a group's member count for a specific month and year or the current one, optionally with growth between two months.
  *     security:
  *      - apiKey: []
  *     tags:
@@ -101,9 +147,39 @@ async function getGroupMemberCount(groupId, month, year) {
  *         schema:
  *           type: string
  *         description: The year, defaults to current year
+ *       - in: query
+ *         name: growth
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *         description: When true, returns growth information instead of only a single count
+ *       - in: query
+ *         name: fromMonth
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: The start month for growth calculation (1-12)
+ *       - in: query
+ *         name: fromYear
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: The start year for growth calculation, defaults to current year
+ *       - in: query
+ *         name: toMonth
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: The end month for growth calculation, defaults to current month
+ *       - in: query
+ *         name: toYear
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: The end year for growth calculation, defaults to current year
  *     responses:
  *       200:
- *         description: Successfully retrieved member count
+ *         description: Successfully retrieved member count or growth data
  *         content:
  *           application/json:
  *             schema:
@@ -111,7 +187,25 @@ async function getGroupMemberCount(groupId, month, year) {
  *               properties:
  *                 memberCount:
  *                   type: number
- *                   description: The member count of the group
+ *                   description: The member count of the group for the requested month
+ *                 fromMonth:
+ *                   type: number
+ *                 fromYear:
+ *                   type: number
+ *                 fromMemberCount:
+ *                   type: number
+ *                 toMonth:
+ *                   type: number
+ *                 toYear:
+ *                   type: number
+ *                 toMemberCount:
+ *                   type: number
+ *                 growth:
+ *                   type: number
+ *                   description: The difference between toMemberCount and fromMemberCount
+ *                 growthPercent:
+ *                   type: number
+ *                   description: The percent change from the starting month to the target month
  *       400:
  *         description: Invalid params
  *       500:
@@ -131,7 +225,14 @@ async function getGroupMemberCount(groupId, month, year) {
  */
 router.get('/', async (req, res) => {
     try {
-        const { groupId, month, year } = req.query || {};
+        const { groupId, month, year, growth, fromMonth, fromYear, toMonth, toYear } = req.query || {};
+        const wantsGrowth = parseBoolean(growth) || Boolean(fromMonth);
+
+        if (wantsGrowth) {
+            const growthResult = await getGroupMemberGrowth(groupId, fromMonth, fromYear, toMonth, toYear);
+            return res.json(growthResult);
+        }
+
         const memberCount = await getGroupMemberCount(groupId, month, year);
         res.json({ memberCount });
     } catch (err) {
