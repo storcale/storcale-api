@@ -67,6 +67,10 @@
  *               properties:
  *                 stats:
  *                   type: object
+ *                 totalKills:
+ *                   type: number
+ *                 totalDeaths:
+ *                   type: number
  *                 matches:
  *                   type: array
  *                   items:
@@ -295,6 +299,8 @@ function buildGlobalStats(matchObjs, minKills) {
         MatchCount: matchObjs.length,
         TotalKills: totalKills,
         TotalDeaths: totalDeaths,
+        totalKills,
+        totalDeaths,
         AveragePing: pingCount > 0 ? Math.round(totalPing / pingCount) : 0,
         TopKillers,
         TopDeaths,
@@ -353,7 +359,11 @@ router.get('/', async (req, res) => {
 
         if (!userId) {
             const stats = buildGlobalStats(matchObjs, minKillsKD);
-            const response = { stats };
+            const response = {
+                stats,
+                totalKills: stats.TotalKills,
+                totalDeaths: stats.TotalDeaths,
+            };
 
             if (ifMatches === 'true') response.matches = matchObjs;
 
@@ -362,7 +372,11 @@ router.get('/', async (req, res) => {
 
         const { stats, commands } = buildUserStats(userId, matchObjs);
 
-        const response = { stats };
+        const response = {
+            stats,
+            totalKills: stats.Kills,
+            totalDeaths: stats.Deaths,
+        };
 
         if (ifMatches === 'true') response.matches = matchObjs;
         if (ifCommands === 'true') response.commands = commands;
