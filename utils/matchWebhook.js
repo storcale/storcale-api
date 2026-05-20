@@ -80,7 +80,7 @@ function buildEmbed(match) {
             },
         ],
         footer: {
-            text: `Session ${match.sessionId} • ${match.region || 'Unknown region'} • v${match.terminalVersion} - The Vanguard Development Team`,
+            text: `Session ${match.sessionId} • ${match.region || 'Unknown region'} • ${match.terminalVersion} - The Vanguard Development Team`,
         },
         timestamp,
     };
