@@ -42,7 +42,6 @@
  *         schema:
  *           type: string
  *         description: Filter matches by map name (partial match).
- *         description: Include stats in response (default true).
  *       - in: query
  *         name: matches
  *         schema:
