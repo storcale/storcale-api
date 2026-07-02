@@ -1,4 +1,3 @@
-
 const express = require('express');
 const app = module.exports = express();
 const fs = require('fs');
@@ -10,6 +9,7 @@ app.use(express.json());
 global.__basedir = `${__dirname}`;
 
 const bannedIpsPath = path.join(__dirname, '/envs/banned_ips.env.json');
+
 function readBannedIps() {
     try {
         if (!fs.existsSync(bannedIpsPath)) return {};
@@ -19,14 +19,29 @@ function readBannedIps() {
     }
 }
 
+// Cache 
+let bannedIpsCache = readBannedIps();
+
+try {
+    fs.watch(bannedIpsPath, { persistent: false }, (eventType) => {
+        if (eventType === 'change' || eventType === 'rename') {
+            bannedIpsCache = readBannedIps();
+        }
+    });
+} catch (e) {
+
+}
+
 function writeBannedIps(obj) {
     try {
         fs.writeFileSync(bannedIpsPath, JSON.stringify(obj, null, 2));
+        bannedIpsCache = obj; // keep cache authoritative immediately, no re-read needed
         return true;
     } catch (e) {
         return false;
     }
 }
+
 const { notifyRateLimitExceeded } = require('./utils/notify');
 const rateLimitWindowSec = Number(process.env.RATE_LIMIT_WINDOW_SEC) || 60; // seconds
 const rateLimitMax = Number(process.env.RATE_LIMIT_MAX) || 60; // max requests per window
@@ -77,7 +92,7 @@ const swaggerOptions = {
 const swaggerSpec = swaggerJSDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Admin UI routes 
+// Admin UI routes
 try {
     const adminUi = require('./routes/admin-ui');
     app.use(adminUi);
@@ -90,11 +105,20 @@ try {
 
 const apiKeyPath = path.join(__dirname, '/envs/apikeys.env.json');
 const apiKeysJson = JSON.parse(fs.readFileSync(apiKeyPath, 'utf8'));
-// helper to read rate limits from api key entry (if present)
+
+
+const rateLimitCache = new Map();
+
 function getRateLimitsForKey(key) {
     const globalWindow = Number(process.env.RATE_LIMIT_WINDOW_SEC) || 60;
     const globalMax = Number(process.env.RATE_LIMIT_MAX) || 60;
+
     if (!key || key === 'none') return { windowSec: globalWindow, max: globalMax };
+
+    const cached = rateLimitCache.get(key);
+    if (cached) return cached;
+
+    let result = { windowSec: globalWindow, max: globalMax };
     try {
         for (const [name, entry] of Object.entries(apiKeysJson || {})) {
             if (!entry || typeof entry !== 'object') continue;
@@ -108,16 +132,29 @@ function getRateLimitsForKey(key) {
                 const m = rawM !== undefined && rawM !== null ? Number(rawM) : null;
                 // if window looks like milliseconds (>=1000), convert to seconds
                 const windowSec = w ? (w >= 1000 ? Math.floor(w / 1000) : w) : null;
-                return { windowSec: windowSec || globalWindow, max: m || globalMax };
+                result = { windowSec: windowSec || globalWindow, max: m || globalMax };
+                break;
             }
         }
     } catch (e) {
         // fall back to global
     }
-    return { windowSec: globalWindow, max: globalMax };
-}
-// ? Logger 
 
+    rateLimitCache.set(key, result);
+    return result;
+}
+
+app.use((req, res, next) => {
+    if (!req.originalUrl.startsWith('/api/')) return next();
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    if (bannedIpsCache[clientIp]) {
+        res.status(403).json({ error: 'You are banned.' });
+        return;
+    }
+    next();
+});
+
+// ? Logger
 const logFilePath = path.join(__dirname, 'access.log');
 app.use((req, res, next) => {
     if (req.originalUrl.startsWith('/api-docs/') || req.originalUrl === '/api-docs') return next();
@@ -131,16 +168,16 @@ app.use((req, res, next) => {
 
     res.on('finish', () => {
         const statusCode = res.statusCode;
-    //
-    const now = Math.floor(Date.now() / 1000);
-    const identifier = apiKey && apiKey !== 'none' ? `key:${apiKey}` : `ip:${clientIp}`;
-    const arr = rateStore.get(identifier) || [];
-    const limits = getRateLimitsForKey(apiKey);
-    const windowStart = now - limits.windowSec;
-    const recent = arr.filter(t => t >= windowStart);
-    const rateLeft = Math.max(0, limits.max - recent.length);
-            const logLine = `[${new Date().toISOString()}] ${req.method} ${req.url} - api-key: ${apiKey} - timestamp: ${timestamp} ${body} - query: ${query} - response: ${statusCode} - ip: ${clientIp} - rateLeft: ${rateLeft}`;
-        
+        //
+        const now = Math.floor(Date.now() / 1000);
+        const identifier = apiKey && apiKey !== 'none' ? `key:${apiKey}` : `ip:${clientIp}`;
+        const arr = rateStore.get(identifier) || [];
+        const limits = getRateLimitsForKey(apiKey);
+        const windowStart = now - limits.windowSec;
+        const recent = arr.filter(t => t >= windowStart);
+        const rateLeft = Math.max(0, limits.max - recent.length);
+        const logLine = `[${new Date().toISOString()}] ${req.method} ${req.url} - api-key: ${apiKey} - timestamp: ${timestamp} ${body} - query: ${query} - response: ${statusCode} - ip: ${clientIp} - rateLeft: ${rateLeft}`;
+
         console.log(logLine);
 
         try {
@@ -156,16 +193,11 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
     if (!req.originalUrl.startsWith('/api/')) return next();
 
-
     const apiKey = req.get('api-key') || req.query?.['api-key'] || 'none';
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     const identifier = apiKey && apiKey !== 'none' ? `key:${apiKey}` : `ip:${clientIp}`;
 
-    const bans = readBannedIps();
-    if (bans[clientIp]) {
-        res.status(403).json({ error: 'You are banned.' });
-        return;
-    }
+   
 
     const limits = getRateLimitsForKey(apiKey);
     const now = Math.floor(Date.now() / 1000);
@@ -194,8 +226,9 @@ app.use((req, res, next) => {
 });
 
 // Automatically load routes
+console.time('loadRoutes');
 loadRoutes(app, path.join(__dirname, 'routes'), apiKeysJson);
-
+console.timeEnd("loadRoutes");
 
 app.get('/api/admin/internal/rate-status', (req, res) => {
     const key = req.get('api-key') || req.query?.['api-key'];

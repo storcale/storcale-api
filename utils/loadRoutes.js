@@ -52,41 +52,35 @@ function apiKeyMiddleware(allowedKeys) {
 }
 function loadRoutes(app, routesDir, apiKeysJson, baseUrl = '/api') {
     const publicDirs = (apiKeysJson.publicDirs || []).map(dir => dir.toLowerCase());
-
     const walk = (dir, prefix = '') => {
-        fs.readdirSync(dir).forEach(file => {
+        const entries = fs.readdirSync(dir);
+        entries.forEach(file => {
             const fullPath = path.join(dir, file);
-            const stat = fs.statSync(fullPath);
-
+            
+            const stat = fs.statSync(fullPath);;
             if (stat.isDirectory()) {
                 walk(fullPath, path.join(prefix, file));
             } else if (file === 'index.js') {
                 const routePath = path.join(prefix).replace(/\\/g, '/');
                 const endpointPath = routePath.replace(/^\/?/, '');
                 const router = require(fullPath);
-
                 const dirName = path.basename(path.join(prefix));
                 const isPublic = publicDirs.includes(dirName.toLowerCase());
-
                 if (isPublic) {
                     app.use(`${baseUrl}/${endpointPath}`, router);
                     console.log(`Mounted PUBLIC route: ${baseUrl}/${endpointPath}`);
                 } else {
                     const allowedKeys = getPermsForPath(apiKeysJson, endpointPath);
-                    // We'll use a wrapper that enforces rate-limiting and API key middleware.
                     const middleware = [
                         apiKeyMiddleware(allowedKeys),
                         rateLimitPerKey(apiKeysJson),
                     ];
-                    // console.log(`Allowed keys for ${endpointPath}:`, allowedKeys);
                     app.use(`${baseUrl}/${endpointPath}`, middleware, router);
                     console.log(`Mounted PROTECTED route: ${baseUrl}/${endpointPath}`);
                 }
             }
         });
     };
-
     walk(routesDir);
 }
-
 module.exports = loadRoutes;
