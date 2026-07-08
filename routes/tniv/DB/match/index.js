@@ -37,6 +37,9 @@ const logFilePath = path.join(__dirname, 'matches.log');
  *                 body:
  *                   type: string
  *                   example: Logged!
+ *                 code:
+ *                   type: string
+ *                   description: The sessionId of the logged match
  *       400:
  *         description: Invalid match data
  *       401:
@@ -67,8 +70,8 @@ router.post('/', (req, res) => {
                 apiKey:  process.env.ADMIN_KEY,
             }).catch(e => console.error('[matchWebhook] Failed:', e?.response?.data || e?.message));
         }
-
-        return res.status(200).json({ body: 'Logged!' });
+        matchCode = matchData.sessionId || '';
+        return res.status(200).json({ body: 'Logged!',code:matchCode });
     });
 });
 
