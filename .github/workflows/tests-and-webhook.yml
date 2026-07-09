@@ -1,35 +1,23 @@
 name: Tests and Discord Notify
-
 on:
   push:
     branches:
       - main
-
 jobs:
   test-and-notify:
     runs-on: ubuntu-latest
     environment: env
     permissions:
       contents: read
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          version: 10.11.1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
+          bun-version: latest
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+        run: bun install --frozen-lockfile
       - name: Run tests
         id: tests
         continue-on-error: true
@@ -40,9 +28,8 @@ jobs:
           ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
         run: |
           set -o pipefail
-          npx jest --config jest.config.cjs --runInBand --timeout=30000 2>&1 | tee test-output.txt
+          bunx jest --config jest.config.cjs --runInBand --timeout=30000 2>&1 | tee test-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
-
       - name: Send Discord webhook
         if: always()
         env:
@@ -55,23 +42,19 @@ jobs:
           import os
           import sys
           import urllib.request
-          from datetime import datetime
-
+          from datetime import datetime, timezone
           webhook = os.environ.get("WEBHOOK_URL", "").strip()
           if not webhook:
               print("No WEBHOOK secret")
               sys.exit(0)
-
           outcome = os.environ.get("TESTS_OUTCOME", "unknown")
           exit_code = os.environ.get("TESTS_EXIT_CODE", "unknown")
           test_output_path = "test-output.txt"
           summary = "No test output captured."
-
           if os.path.exists(test_output_path):
               with open(test_output_path, "r", encoding="utf-8", errors="ignore") as fh:
                   lines = [line.rstrip() for line in fh.readlines() if line.strip()]
               summary = "\n".join(lines[-20:]) if lines else summary
-
           passed = outcome == "success" and str(exit_code) == "0"
           color = 0x2ECC71 if passed else 0xE74C3C
           title = "✅ Tests passed" if passed else "❌ Tests failed"
@@ -82,26 +65,28 @@ jobs:
               f"Exit code: {exit_code}\n\n"
               f"```text\n{summary}\n```"
           )
-
           payload = {
               "embeds": [{
                   "title": title,
                   "description": description,
                   "color": color,
-                  "timestamp": datetime.utcnow().isoformat() + "Z",
+                  "timestamp": datetime.now(timezone.utc).isoformat(),
                   "footer": {"text": "GitHub Actions"},
               }]
           }
-
           request = urllib.request.Request(
               webhook,
               data=json.dumps(payload).encode("utf-8"),
               headers={"Content-Type": "application/json"},
           )
-          with urllib.request.urlopen(request, timeout=20) as response:
-              print(f"Webhook sent: {response.status}")
+          try:
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  print(f"Webhook sent: {response.status}")
+          except urllib.error.HTTPError as e:
+              print(f"Webhook failed: {e.code} {e.reason}")
+              print(e.read().decode(errors='ignore'))
+              sys.exit(0)
           PY
-
       - name: Enforce test result
         if: always()
         run: |
