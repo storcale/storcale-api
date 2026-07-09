@@ -68,7 +68,6 @@ async function notifyDeniedWebhook(hasPing, hasVanguard, isDuplicate, info) {
     }
 }
 
-
 async function notifyRateLimitExceeded(reqInfo) {
     try {
         const title = 'TNIV API | Rate limit exceeded';

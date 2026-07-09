@@ -268,10 +268,3 @@ app.use((err, req, res, next) => {
 app.use((req, res) => {
     res.status(404).send({ error: "Sorry, can't find that" });
 });
-
-if (!module.parent) {
-    const port = process.env.PORT || 9902;
-    app.listen(port, () => {
-        console.log(`Express started on port ${port}`);
-    });
-}
