@@ -75,9 +75,12 @@ jobs:
               }]
           }
           request = urllib.request.Request(
-              webhook,
-              data=json.dumps(payload).encode("utf-8"),
-              headers={"Content-Type": "application/json"},
+                webhook,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                "Content-Type": "application/json",
+                "User-Agent": "GitHubActions-DiscordWebhook/1.0",
+            },
           )
           try:
               with urllib.request.urlopen(request, timeout=20) as response:
