@@ -177,7 +177,7 @@ app.use((req, res, next) => {
         const windowStart = now - limits.windowSec;
         const recent = arr.filter(t => t >= windowStart);
         const rateLeft = Math.max(0, limits.max - recent.length);
-        const logLine = `[${new Date().toISOString()}] ${req.method} ${req.url} - api-key: ${apiKey} - timestamp: ${timestamp} ${body} - query: ${query} - response: ${statusCode} - ip: ${clientIp} - rateLeft: ${rateLeft}`;
+        const logLine = `[${new Date().toISOString()}] ${req.method} ${req.url} - api-key: ${apiKey.slice(0, 5)} - timestamp: ${timestamp} ${body} - query: ${query} - response: ${statusCode} - ip: ${clientIp} - rateLeft: ${rateLeft}`;
 
         console.log(logLine);
 
