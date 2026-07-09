@@ -3,5 +3,4 @@ module.exports = {
   collectCoverage: false,
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.js'],
-  setupFiles: ["./tests/jest.setup.js"],
 };
