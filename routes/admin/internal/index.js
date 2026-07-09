@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
 const { notifyRateLimitExceeded } = require(path.join(global.__basedir, '/utils/notify.js'));
+const { loadApiKeysConfig } = require(path.join(global.__basedir, '/utils/apiKeys.js'));
 const bannedIpsPath = path.join(global.__basedir, '/envs/banned_ips.json');
 const { createSession } = require(path.join(global.__basedir, '/utils/adminSessions.js'));
 
@@ -108,11 +109,8 @@ router.put('/deactivate', async (req, res) => {
     const apiKey = req.body.key;
     if (!apiKey) return res.status(400).json({ error: 'Missing key query param.' });
 
-    const apikeysPath = path.join(global.__basedir, '/envs/apikeys.env.json');
-    let data;
-    try {
-        data = JSON.parse(fs.readFileSync(apikeysPath, 'utf8'));
-    } catch {
+    const { path: apikeysPath, data } = loadApiKeysConfig(global.__basedir);
+    if (!data || typeof data !== 'object') {
         return res.status(500).json({ error: 'Failed to read apikeys.env.json.' });
     }
 

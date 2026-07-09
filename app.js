@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const glob = require('glob');
 const loadRoutes = require('./utils/loadRoutes');
+const { loadApiKeysConfig } = require('./utils/apiKeys');
+const { sendDeploymentWebhook } = require('./utils/deploymentWebhook');
 const querystring = require('node:querystring');
 app.use(express.json());
 global.__basedir = `${__dirname}`;
@@ -103,8 +105,7 @@ try {
 
 // get api keys
 
-const apiKeyPath = path.join(__dirname, '/envs/apikeys.env.json');
-const apiKeysJson = JSON.parse(fs.readFileSync(apiKeyPath, 'utf8'));
+const { data: apiKeysJson } = loadApiKeysConfig(__dirname);
 
 
 const rateLimitCache = new Map();
@@ -226,9 +227,20 @@ app.use((req, res, next) => {
 });
 
 // Automatically load routes
+const loadRoutesStart = Date.now();
 console.time('loadRoutes');
 loadRoutes(app, path.join(__dirname, 'routes'), apiKeysJson);
-console.timeEnd("loadRoutes");
+console.timeEnd('loadRoutes');
+const loadRoutesDurationMs = Date.now() - loadRoutesStart;
+
+if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
+    sendDeploymentWebhook({
+        loadRoutesTimeMs: loadRoutesDurationMs,
+        environment: process.env.NODE_ENV,
+    }).catch((error) => {
+        console.error('Deployment webhook failed:', error.message || error);
+    });
+}
 
 app.get('/api/admin/internal/rate-status', (req, res) => {
     const key = req.get('api-key') || req.query?.['api-key'];

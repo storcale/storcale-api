@@ -2,6 +2,7 @@ const request = require("supertest");
 const app = require("../app");
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 
 const results = [];
 const logFilePath = path.join(__dirname, "../access.log");

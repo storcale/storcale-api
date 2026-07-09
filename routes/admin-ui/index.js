@@ -4,10 +4,11 @@ const fs = require('fs');
 const router = express.Router();
 const { exec } = require('child_process');
 const { createSessionCookie, verifySessionCookie, clearCookieHeader } = require(path.join(global.__basedir, '/utils/adminAuth.js'));
+const { loadApiKeysConfig } = require(path.join(global.__basedir, 'utils', 'apiKeys.js'));
 
 const LOG_PATH = path.join(global.__basedir, 'access.log');
 const BANS_PATH = path.join(global.__basedir, 'envs', 'banned_ips.json');
-const APIKEYS_PATH = path.join(global.__basedir, 'envs', 'apikeys.env.json');
+const { path: APIKEYS_PATH } = loadApiKeysConfig(global.__basedir);
 
 function runReloadScript() {
     const scriptPath = path.join(global.__basedir, '/reload.sh');
