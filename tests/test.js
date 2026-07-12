@@ -17,6 +17,8 @@ function log(message) {
         console.error("Failed to write log:", err);
     }
 }
+const agent = request.agent(app)
+    .set('api-key', process.env.ADMIN_KEY);
 
 async function runTest(name, fn) {
     try {
@@ -49,13 +51,12 @@ afterAll(async () => {
     log(logLine);
 
     try {
-        await request(app)
+        await agent
             .post("/api/admin/notify")
-            .set("api-key", process.env.ADMIN_KEY)
             .send({
-                title: failed ? "Tests Failed" : "Tests Passed",
+                title: process.env.NODE_ENV.toUpperCase() + (failed ? " : Tests Failed" : " : Tests Passed"),
                 message: logLine,
-                priority: failed ? "3" : "5",
+                priority: failed ? "5" : "3",
                 actions: [
                     {
                         action: "view",
@@ -65,7 +66,7 @@ afterAll(async () => {
                     }
                 ],
                 click: "",
-                email: failed ? process.env.EMAIL : ""
+                email: ""
             })
             .expect(200);
     } catch (err) {
@@ -90,3 +91,35 @@ describe("General", () => {
         })
     );
 });
+// TNIV
+describe("TNIV/group",() => {
+    test("Past membercount",() =>
+        runTest("June 2026 membercount", async () => {
+            await agent
+                .get("/api/tniv/group/membercount")
+                .query({ groupId: 3612873, year: 2026, month: 5 })
+                .expect(res => {
+                    console.log(res.body)
+                    if (res.body.memberCount !== 79888) {
+                        throw new Error("Response does not contain expected memberCount");
+                    }
+                })
+                .expect(200);
+        }),
+    )
+    test("Current membercount",() =>
+        runTest("Current membercount", async () => {
+            const res = await agent
+                .get("/api/tniv/group/membercount")
+                .query({ groupId: 3612873 })
+                .expect(res => {
+                    if (typeof res.body.memberCount !== 'number') {
+                        throw new Error("Response does not contain memberCount");
+                    }
+                })
+                .expect(200)
+            
+        })
+    )
+})
+

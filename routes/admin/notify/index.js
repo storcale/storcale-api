@@ -7,7 +7,7 @@ const { notify,notifyDeniedWebhook,notifyRateLimitExceeded } = require(path.join
 router.post('/denied', async (req, res) => {
     try {
         const body = req.body;
-        const response = notifyDeniedWebhook(true,true,true)
+        const response = await notifyDeniedWebhook(true,true,true)
         // const response = await notify(body.title, body.message, body.priority, body.actions, body.click, body.email)
         res.json({ body: response })
     } catch (err) {
@@ -17,9 +17,16 @@ router.post('/denied', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const body = req.body;
-        const response = notify(body.title, body.message, body.priority, body.actions, body.click, body.email)
-        // const response = await notify(body.title, body.message, body.priority, body.actions, body.click, body.email)
-        res.json({ body: response })
+        // sanitize incoming fields
+        const title = body && body.title ? String(body.title) : '';
+        const message = body && body.message ? String(body.message) : '';
+        const priority = body && body.priority !== undefined && body.priority !== null ? String(body.priority) : '';
+        const actions = Array.isArray(body.actions) ? body.actions : null;
+        const click = body && body.click ? String(body.click) : '';
+        const email = body && body.email ? String(body.email) : '';
+
+        notify(title, message, priority, actions, click, email)
+        res.json({ body: 'notification queued' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -27,7 +34,7 @@ router.post('/', async (req, res) => {
 router.post('/rateLimit', async (req, res) => {
     try {
         const body = req.body;
-        const response = notifyRateLimitExceeded(body)
+        const response = await notifyRateLimitExceeded(body)
         res.json({ body: response })
     } catch (err) {
         res.status(500).json({ error: err.message });

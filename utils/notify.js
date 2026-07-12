@@ -17,12 +17,26 @@ async function notify(title, message, priority, actions, click, email) {
         if (actions && actions.length > 0) headers['Actions'] = JSON.stringify(actions);
         if (click) headers['Click'] = click;
         if (email) headers['Email'] = email;
-        const response = await fetch(`https://ntfy.sh/${process.env.NOTIFY_URL}`, {
-            method: 'POST',
-            headers,
-            body: message || ''
-        });
-        return await response.text();
+        const url = `https://ntfy.sh/${process.env.NOTIFY_URL}`;
+        const DEFAULT_TIMEOUT_MS = 3000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: message || '',
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            return await response.text();
+        } catch (err) {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') {
+                return { error: `notify timeout after ${DEFAULT_TIMEOUT_MS}ms` };
+            }
+            throw err;
+        }
     } catch (error) {
         return { error: error.message }
     }
