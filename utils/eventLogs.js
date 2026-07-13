@@ -1,35 +1,72 @@
 const { eventTypes } = require("./eventTypes.js");
+const { google } = require("googleapis");
+const path = require("path");
+
+const SHEET_NAME = "Official Bot Logging";
+const RANGE = "A3:K";
+
+function extractSpreadsheetId(url) {
+    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (!match) {
+        throw new Error(`VG_MAINFRAME does not look like a Google Sheets URL: ${url}`);
+    }
+    return match[1];
+}
 
 async function fetchEventsFromSheet() {
     if (!process.env.VG_MAINFRAME) {
-        throw new Error("DB_URL is not defined in process.env");
+        throw new Error("VG_MAINFRAME is not defined in process.env");
     }
-    const bot_Logs = process.env.VG_MAINFRAME + "/gviz/tq?tqx=out:csv&sheet=Official%20Bot%20Logging&range=A3:K";
-    const res = await fetch(bot_Logs);
-    if (!res.ok) {
-        throw new Error("Failed to fetch data from Google Sheets");
+
+    const spreadsheetId = extractSpreadsheetId(process.env.VG_MAINFRAME);
+    const keyFile = path.join(global.__basedir, "/envs/gsaKey.env.json");
+
+    const auth = new google.auth.GoogleAuth({
+        keyFile,
+        scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    });
+
+    let client;
+    let sheets;
+    try {
+        client = await auth.getClient();
+        sheets = google.sheets({ version: "v4", auth: client });
+    } catch (err) {
+        throw new Error(`Failed to authenticate with Google service account: ${err.message}`);
     }
-    const data = await res.text();
-    const rows = data
-        .split("\n")
-        .filter(row => row.trim().length > 0)
-        .map(row => {
-            const fields = row.split('","').map(field => field.replace(/^"|"$/g, ""));
-            return {
-                timestamp: fields[0] || "",
-                date: fields[1] || "",
-                username: fields[2] || "",
-                form_type: fields[3] || "",
-                focus: fields[4] || "",
-                event_type: fields[5] || "",
-                proof: fields[6] || "",
-                attendance: fields[7] || "",
-                did_win: (fields[5] && fields[5].toLowerCase().includes("raid/defense")) ? (fields[8] || "") : "",
-                against: (fields[5] && fields[5].toLowerCase().includes("raid/defense")) ? (fields[9] || "") : "",
-                map: (fields[5] && fields[5].toLowerCase().includes("raid/defense")) ? (fields[10] || "") : "",
-            };
-        })
+
+    let response;
+    try {
+        response = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: `'${SHEET_NAME}'!${RANGE}`,
+        });
+    } catch (err) {
+        const apiMessage = err?.errors?.[0]?.message || err.message;
+        throw new Error(
+            `Failed to fetch data from Google Sheets (spreadsheetId=${spreadsheetId}, sheet="${SHEET_NAME}"): ${apiMessage}`
+        );
+    }
+
+    const values = response.data.values || [];
+
+    const rows = values
+        .filter(fields => fields && fields.length > 0)
+        .map(fields => ({
+            timestamp: fields[0] || "",
+            date: fields[1] || "",
+            username: fields[2] || "",
+            form_type: fields[3] || "",
+            focus: fields[4] || "",
+            event_type: fields[5] || "",
+            proof: fields[6] || "",
+            attendance: fields[7] || "",
+            did_win: (fields[5] && fields[5].toLowerCase().includes("raid/defense")) ? (fields[8] || "") : "",
+            against: (fields[5] && fields[5].toLowerCase().includes("raid/defense")) ? (fields[9] || "") : "",
+            map: (fields[5] && fields[5].toLowerCase().includes("raid/defense")) ? (fields[10] || "") : "",
+        }))
         .filter(row => row.username);
+
     return rows;
 }
 
@@ -41,6 +78,7 @@ class DB {
             this.events = await fetchEventsFromSheet();
         } catch (error) {
             console.error("Error initializing DB:", error);
+            this.events = [];
         }
     }
     getEvents() {
