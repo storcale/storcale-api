@@ -23,7 +23,6 @@ jobs:
           GSA_KEY: ${{ secrets.GSA_KEY }}
           MATCHES_LOG_SAMPLE: ${{ secrets.matchesLogSample }}
         run: |
-          mkdir -p envs routes/tniv/DB/match
           python - <<'PY'
           import os
           from pathlib import Path
@@ -57,7 +56,7 @@ jobs:
           fi
           cat test-output.txt >> logs.log
       - name: Upload logs artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: logs
           path: logs.log
@@ -73,6 +72,7 @@ jobs:
           import os
           import sys
           import urllib.request
+          import urllib.error
           import uuid
           from datetime import datetime, timezone
 
@@ -80,6 +80,10 @@ jobs:
           if not webhook:
               print("No WEBHOOK secret")
               sys.exit(0)
+
+          if not webhook.endswith("wait=true"):
+              sep = "&" if "?" in webhook else "?"
+              webhook = f"{webhook}{sep}wait=true"
 
           outcome = os.environ.get("TESTS_OUTCOME", "unknown")
           exit_code = os.environ.get("TESTS_EXIT_CODE", "unknown")
@@ -89,7 +93,7 @@ jobs:
           summary = "No test output captured."
           if os.path.exists(test_output_path):
               with open(test_output_path, "r", encoding="utf-8", errors="ignore") as fh:
-            it didnt work, the file is not included in the webhook sent      lines = [line.rstrip() for line in fh.readlines() if line.strip()]
+                  lines = [line.rstrip() for line in fh.readlines() if line.strip()]
               summary = "\n".join(lines[-20:]) if lines else summary
 
           passed = outcome == "success" and str(exit_code) == "0"
@@ -114,31 +118,43 @@ jobs:
           }
 
           boundary = f"----WebKitFormBoundary{uuid.uuid4().hex}"
-          parts = []
-          parts.append(f"--{boundary}")
-          parts.append('Content-Disposition: form-data; name="payload_json"')
-          parts.append('Content-Type: application/json')
-          parts.append('')
-          parts.append(json.dumps(payload))
+          body = bytearray()
+
+          def add_field(name, value, content_type=None):
+              body.extend(f"--{boundary}\r\n".encode("utf-8"))
+              disp = f'Content-Disposition: form-data; name="{name}"'
+              body.extend(f"{disp}\r\n".encode("utf-8"))
+              if content_type:
+                  body.extend(f"Content-Type: {content_type}\r\n".encode("utf-8"))
+              body.extend(b"\r\n")
+              if isinstance(value, bytes):
+                  body.extend(value)
+              else:
+                  body.extend(value.encode("utf-8"))
+              body.extend(b"\r\n")
+
+          add_field("payload_json", json.dumps(payload), "application/json")
 
           if os.path.exists(log_path):
               with open(log_path, "rb") as fh:
                   file_bytes = fh.read()
-              parts.append(f"--{boundary}")
-              parts.append('Content-Disposition: form-data; name="file"; filename="logs.log"')
-              parts.append('Content-Type: text/plain; charset=utf-8')
-              parts.append('Content-Transfer-Encoding: binary')
-              parts.append('')
-              parts.append(file_bytes.decode("utf-8", errors="replace"))
+              body.extend(f"--{boundary}\r\n".encode("utf-8"))
+              body.extend(
+                  b'Content-Disposition: form-data; name="files[0]"; filename="logs.log"\r\n'
+              )
+              body.extend(b"Content-Type: text/plain; charset=utf-8\r\n\r\n")
+              body.extend(file_bytes)
+              body.extend(b"\r\n")
 
-          parts.append(f"--{boundary}--")
-          body = "\r\n".join(parts).encode("utf-8")
+          body.extend(f"--{boundary}--\r\n".encode("utf-8"))
+          body = bytes(body)
 
           request = urllib.request.Request(
               webhook,
               data=body,
               headers={
                   "Content-Type": f"multipart/form-data; boundary={boundary}",
+                  "Content-Length": str(len(body)),
                   "User-Agent": "GitHubActions-DiscordWebhook/1.0",
               },
           )
@@ -148,7 +164,7 @@ jobs:
                   print(f"Webhook sent: {response.status}")
           except urllib.error.HTTPError as e:
               print(f"Webhook failed: {e.code} {e.reason}")
-              print(e.read().decode(errors='ignore'))
+              print(e.read().decode(errors="ignore"))
               sys.exit(0)
           PY
       - name: Enforce test result
