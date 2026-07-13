@@ -31,7 +31,7 @@ jobs:
         if: steps.checkout.outcome == 'success'
         env:
           GSA_KEY: ${{ secrets.GSA_KEY }}
-          MATCHES_LOG_SAMPLE: ${{ secrets.MATCHESLOGSAMPLE }}
+          MATCHES_LOG_SAMPLE: ${{ secrets.matchesLogSample }}
         run: |
           python - <<'PY'
           import os
@@ -41,7 +41,7 @@ jobs:
           Path('envs').mkdir(parents=True, exist_ok=True)
           Path('routes/tniv/DB/match').mkdir(parents=True, exist_ok=True)
 
-          with open('envs/gsaKey.env.json', 'w', encoding='utf-8') as fh:
+          with open('envs/gsaKey.json', 'w', encoding='utf-8') as fh:
               fh.write(os.environ.get('GSA_KEY', ''))
 
           with open('routes/tniv/DB/match/matches.log', 'w', encoding='utf-8') as fh:
@@ -57,11 +57,14 @@ jobs:
           NOTIFY_URL: ${{ secrets.NOTIFY_URL }}
           ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
           VG_MAINFRAME: ${{ secrets.VG_MAINFRAME }}
-          GSA_KEY: ${{ secrets.GSA_KEY }}
+          NODE_OPTIONS: --experimental-vm-modules
         run: |
+          set +e
           set -o pipefail
           bunx jest --config jest.config.cjs --runInBand --timeout=30000 2>&1 | tee test-output.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          code=${PIPESTATUS[0]}
+          echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
+          exit "${code}"
       - name: Collect logs
         id: collect
         if: always()
@@ -232,6 +235,6 @@ jobs:
             fi
           done
           if [ "$FAILED" -eq 1 ]; then
-            echo "One or more steps failed"
+            echo "One or more steps failed — see the logs artifact and Discord message for details."
             exit 1
           fi

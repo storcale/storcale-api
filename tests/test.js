@@ -146,8 +146,7 @@ describe("TNIV/Sheets", () => {
                 await agent
                     .get("/api/tniv/sheets/events")
                     .expect(res => {
-                        console.log(res.body.main)
-                        if (res.body.length === 0 || !res.body.main) {
+                        if (!Array.isArray(res.body.main) || res.body.main.length === 0) {
                             throw new Error("Events Response is wrong");
                         }
                     })
