@@ -18,9 +18,11 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Create GSA file
+      - name: Create files
         run: |
-          echo "${{ secrets.GSA_KEY }}" > gsaKey.json
+          mkdir envs
+          echo "${{ secrets.GSA_KEY }}" > envs/gsaKey.json
+          echo "${{secrets.matchesLogSample}}" > routes/tniv/DB/match/matches.log
       - name: Run tests
         id: tests
         continue-on-error: true
