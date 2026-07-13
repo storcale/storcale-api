@@ -36,6 +36,12 @@ jobs:
           set -o pipefail
           bunx jest --config jest.config.cjs --runInBand --timeout=30000 2>&1 | tee test-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          printf "\n\n===== ACCESS LOG =====\n\n" > logs.log
+          if [ -f access.log ]; then
+            cat access.log >> logs.log
+            printf "\n\n===== TEST OUTPUT =====\n\n" >> logs.log
+          fi
+          cat test-output.txt >> logs.log
       - name: Send Discord webhook
         if: always()
         env:
@@ -59,7 +65,7 @@ jobs:
           outcome = os.environ.get("TESTS_OUTCOME", "unknown")
           exit_code = os.environ.get("TESTS_EXIT_CODE", "unknown")
           test_output_path = "test-output.txt"
-          log_path = "access.log"
+          log_path = "logs.log"
 
           summary = "No test output captured."
           if os.path.exists(test_output_path):
@@ -99,7 +105,7 @@ jobs:
               with open(log_path, "rb") as fh:
                   file_bytes = fh.read()
               parts.append(f"--{boundary}")
-              parts.append('Content-Disposition: form-data; name="file"; filename="access.log"')
+              parts.append('Content-Disposition: form-data; name="file"; filename="logs.log"')
               parts.append('Content-Type: text/plain')
               parts.append('')
               parts.append(file_bytes.decode("utf-8", errors="replace"))
