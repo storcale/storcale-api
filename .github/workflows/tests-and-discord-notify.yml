@@ -11,14 +11,24 @@ jobs:
       contents: read
     steps:
       - name: Checkout
+        id: checkout
+        continue-on-error: true
         uses: actions/checkout@v4
       - name: Setup Bun
+        id: setup_bun
+        continue-on-error: true
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Install dependencies
+        id: install
+        continue-on-error: true
+        if: steps.checkout.outcome == 'success' && steps.setup_bun.outcome == 'success'
         run: bun install --frozen-lockfile
       - name: Create files
+        id: createfiles
+        continue-on-error: true
+        if: steps.checkout.outcome == 'success'
         env:
           GSA_KEY: ${{ secrets.GSA_KEY }}
           MATCHES_LOG_SAMPLE: ${{ secrets.matchesLogSample }}
@@ -40,32 +50,60 @@ jobs:
       - name: Run tests
         id: tests
         continue-on-error: true
+        if: steps.install.outcome == 'success' && steps.createfiles.outcome == 'success'
         env:
           NODE_ENV: github
           ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
           NOTIFY_URL: ${{ secrets.NOTIFY_URL }}
           ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+          VG_MAINFRAME: ${{ secrets.VG_MAINFRAME }}
         run: |
           set -o pipefail
           bunx jest --config jest.config.cjs --runInBand --timeout=30000 2>&1 | tee test-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
-          printf "\n\n===== ACCESS LOG =====\n\n" > logs.log
-          if [ -f access.log ]; then
-            cat access.log >> logs.log
-            printf "\n\n===== TEST OUTPUT =====\n\n" >> logs.log
-          fi
-          cat test-output.txt >> logs.log
+      - name: Collect logs
+        id: collect
+        if: always()
+        run: |
+          {
+            printf "===== STEP OUTCOMES =====\n"
+            printf "Checkout:        %s\n" "${{ steps.checkout.outcome }}"
+            printf "Setup Bun:       %s\n" "${{ steps.setup_bun.outcome }}"
+            printf "Install deps:    %s\n" "${{ steps.install.outcome }}"
+            printf "Create files:    %s\n" "${{ steps.createfiles.outcome }}"
+            printf "Run tests:       %s (exit_code=%s)\n" "${{ steps.tests.outcome }}" "${{ steps.tests.outputs.exit_code }}"
+
+            printf "\n\n===== ACCESS LOG =====\n\n"
+            if [ -f access.log ]; then
+              cat access.log
+            else
+              printf "(access.log not found — likely failed before Create files ran)\n"
+            fi
+
+            printf "\n\n===== TEST OUTPUT =====\n\n"
+            if [ -f test-output.txt ]; then
+              cat test-output.txt
+            else
+              printf "(test-output.txt not found — Run tests step did not execute)\n"
+            fi
+          } > logs.log
       - name: Upload logs artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: logs
           path: logs.log
+          if-no-files-found: warn
       - name: Send Discord webhook
         if: always()
         env:
           WEBHOOK_URL: ${{ secrets.WEBHOOK }}
           TESTS_OUTCOME: ${{ steps.tests.outcome }}
           TESTS_EXIT_CODE: ${{ steps.tests.outputs.exit_code }}
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          SETUP_BUN_OUTCOME: ${{ steps.setup_bun.outcome }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          CREATEFILES_OUTCOME: ${{ steps.createfiles.outcome }}
         run: |
           python - <<'PY'
           import json
@@ -95,6 +133,16 @@ jobs:
               with open(test_output_path, "r", encoding="utf-8", errors="ignore") as fh:
                   lines = [line.rstrip() for line in fh.readlines() if line.strip()]
               summary = "\n".join(lines[-20:]) if lines else summary
+          else:
+              step_summary = []
+              for label, env_name in [
+                  ("Checkout", "CHECKOUT_OUTCOME"),
+                  ("Setup Bun", "SETUP_BUN_OUTCOME"),
+                  ("Install deps", "INSTALL_OUTCOME"),
+                  ("Create files", "CREATEFILES_OUTCOME"),
+              ]:
+                  step_summary.append(f"{label}: {os.environ.get(env_name, 'unknown')}")
+              summary = "No test output — job failed earlier.\n" + "\n".join(step_summary)
 
           passed = outcome == "success" and str(exit_code) == "0"
           color = 0x2ECC71 if passed else 0xE74C3C
@@ -170,7 +218,19 @@ jobs:
       - name: Enforce test result
         if: always()
         run: |
-          if [ "${{ steps.tests.outcome }}" != "success" ]; then
-            echo "Tests failed"
+          FAILED=0
+          for outcome in \
+            "${{ steps.checkout.outcome }}" \
+            "${{ steps.setup_bun.outcome }}" \
+            "${{ steps.install.outcome }}" \
+            "${{ steps.createfiles.outcome }}" \
+            "${{ steps.tests.outcome }}"
+          do
+            if [ "$outcome" != "success" ]; then
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" -eq 1 ]; then
+            echo "One or more steps failed"
             exit 1
           fi
