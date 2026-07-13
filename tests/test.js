@@ -70,7 +70,7 @@ afterAll(async () => {
             })
             .expect(200);
     } catch (err) {
-        log(`Failed to send notification: ${err.message}`);
+        console.error(`Failed to send notification: ${err.message}`);
     }
 });
 
@@ -99,7 +99,6 @@ describe("TNIV/group",() => {
                 .get("/api/tniv/group/membercount")
                 .query({ groupId: 3612873, year: 2026, month: 5 })
                 .expect(res => {
-                    console.log(res.body)
                     if (res.body.memberCount !== 79888) {
                         throw new Error("Response does not contain expected memberCount");
                     }
@@ -122,4 +121,50 @@ describe("TNIV/group",() => {
         })
     )
 })
-
+describe("TNIV/DB" ,() => {
+    describe("stats",() => {
+        test("Get global stats",() =>
+            runTest("Get global stats", async () => {
+                await agent
+                    .get("/api/tniv/db/player/stats")
+                    .query({ from: "01/01/2024", to: "06/30/2026" })
+                    .expect(res => {
+                        if (typeof res.body.totalKills !== "number" || res.body.totalKills < 1) {
+                            throw new Error("Response does not contain any kills : missing data?");
+                        }
+                    })
+                    .expect(200)
+            })
+        )
+    })
+    // TODO add match -> add DELETE match endpoint to clean up
+})
+describe("TNIV/Sheets", () => {
+    describe("events", () => {
+        test("get Events", () =>
+            runTest("get Events", async () => {
+                await agent
+                    .get("/api/tniv/sheets/events")
+                    .expect(res => {
+                        console.log(res.body.main)
+                        if (res.body.length === 0 || !res.body.main) {
+                            throw new Error("Events Response is wrong");
+                        }
+                    })
+                    .expect(200)
+            })
+        )
+        test("get Event Stats", ()=> 
+            runTest("get Event Stats", async () => {
+                await agent
+                    .get("/api/tniv/sheets/events/stats")
+                    .expect(res => {
+                        if (!res.body || !res.body.stats || res.body.stats.EventCount < 1) {
+                            throw new Error("Event Stats Response is wrong");
+                        }
+                    })
+                    .expect(200)
+            })
+        )
+    })
+})

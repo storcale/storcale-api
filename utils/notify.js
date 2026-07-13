@@ -73,7 +73,7 @@ async function notifyDeniedWebhook(hasPing, hasVanguard, isDuplicate, info) {
             }
         ];
     const click = `${url}/admin-ui/dashboard?api-key=${apiKey}`;
-        const email = process.env.EMAIL || "";
+        const email =  "";
         const response = await notify(title, message, priority, actions, click, email);
         return response;
     } catch (e) {

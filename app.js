@@ -166,6 +166,9 @@ app.use((req, res, next) => {
 
     const body = req.body ? `- body: ${JSON.stringify(req.body)}` : '';
     const query = Object.keys(req.query).length > 0 ? querystring.stringify(req.query) : 'No Query';
+    const host = req.get('host') || 'localhost';
+    const scheme =  req.protocol || 'http';
+    const baseUrl = `${scheme}://${host}${req.path}`;
 
     res.on('finish', () => {
         const statusCode = res.statusCode;
@@ -177,7 +180,7 @@ app.use((req, res, next) => {
         const windowStart = now - limits.windowSec;
         const recent = arr.filter(t => t >= windowStart);
         const rateLeft = Math.max(0, limits.max - recent.length);
-        const logLine = `[${new Date().toISOString()}] ${req.method} ${req.url} - api-key: ${apiKey.slice(0, 5)} - timestamp: ${timestamp} ${body} - query: ${query} - response: ${statusCode} - ip: ${clientIp} - rateLeft: ${rateLeft}`;
+        const logLine = `[${new Date().toISOString()}] ${req.method} ${baseUrl} - api-key: ${apiKey.slice(0, 5)} - timestamp: ${timestamp} ${body} - query: ${query} - response: ${statusCode} - ip: ${clientIp} - rateLeft: ${rateLeft}`;
 
         console.log(logLine);
 
@@ -197,8 +200,6 @@ app.use((req, res, next) => {
     const apiKey = req.get('api-key') || req.query?.['api-key'] || 'none';
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     const identifier = apiKey && apiKey !== 'none' ? `key:${apiKey}` : `ip:${clientIp}`;
-
-   
 
     const limits = getRateLimitsForKey(apiKey);
     const now = Math.floor(Date.now() / 1000);
