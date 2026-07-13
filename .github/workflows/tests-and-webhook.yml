@@ -19,11 +19,25 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Create files
+        env:
+          GSA_KEY: ${{ secrets.GSA_KEY }}
+          MATCHES_LOG_SAMPLE: ${{ secrets.matchesLogSample }}
         run: |
-          mkdir -p envs
-          touch access.log
-          echo "${{ secrets.GSA_KEY }}" > envs/gsaKey.json
-          echo "${{secrets.matchesLogSample}}" > routes/tniv/DB/match/matches.log
+          mkdir -p envs routes/tniv/DB/match
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          Path('access.log').touch(exist_ok=True)
+          Path('envs').mkdir(parents=True, exist_ok=True)
+          Path('routes/tniv/DB/match').mkdir(parents=True, exist_ok=True)
+
+          with open('envs/gsaKey.json', 'w', encoding='utf-8') as fh:
+              fh.write(os.environ.get('GSA_KEY', ''))
+
+          with open('routes/tniv/DB/match/matches.log', 'w', encoding='utf-8') as fh:
+              fh.write(os.environ.get('MATCHES_LOG_SAMPLE', ''))
+          PY
       - name: Run tests
         id: tests
         continue-on-error: true
@@ -75,7 +89,7 @@ jobs:
           summary = "No test output captured."
           if os.path.exists(test_output_path):
               with open(test_output_path, "r", encoding="utf-8", errors="ignore") as fh:
-                  lines = [line.rstrip() for line in fh.readlines() if line.strip()]
+            it didnt work, the file is not included in the webhook sent      lines = [line.rstrip() for line in fh.readlines() if line.strip()]
               summary = "\n".join(lines[-20:]) if lines else summary
 
           passed = outcome == "success" and str(exit_code) == "0"
