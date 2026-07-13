@@ -42,6 +42,11 @@ jobs:
             printf "\n\n===== TEST OUTPUT =====\n\n" >> logs.log
           fi
           cat test-output.txt >> logs.log
+      - name: Upload logs artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: logs
+          path: logs.log
       - name: Send Discord webhook
         if: always()
         env:
@@ -98,6 +103,7 @@ jobs:
           parts = []
           parts.append(f"--{boundary}")
           parts.append('Content-Disposition: form-data; name="payload_json"')
+          parts.append('Content-Type: application/json')
           parts.append('')
           parts.append(json.dumps(payload))
 
@@ -106,7 +112,8 @@ jobs:
                   file_bytes = fh.read()
               parts.append(f"--{boundary}")
               parts.append('Content-Disposition: form-data; name="file"; filename="logs.log"')
-              parts.append('Content-Type: text/plain')
+              parts.append('Content-Type: text/plain; charset=utf-8')
+              parts.append('Content-Transfer-Encoding: binary')
               parts.append('')
               parts.append(file_bytes.decode("utf-8", errors="replace"))
 
