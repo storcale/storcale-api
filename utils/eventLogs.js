@@ -43,8 +43,12 @@ async function fetchEventsFromSheet() {
         });
     } catch (err) {
         const apiMessage = err?.errors?.[0]?.message || err.message;
+        const cause = err?.cause ? ` — cause: ${err.cause.code || ""} ${err.cause.message || err.cause}` : "";
+        const code = err?.code ? ` (code=${err.code})` : "";
+        const status = err?.response?.status ? ` (status=${err.response.status})` : "";
+        console.error("Raw Sheets API error object:", err);
         throw new Error(
-            `Failed to fetch data from Google Sheets (spreadsheetId=${spreadsheetId}, sheet="${SHEET_NAME}"): ${apiMessage}`
+            `Failed to fetch data from Google Sheets (spreadsheetId=${spreadsheetId}, sheet="${SHEET_NAME}"): ${apiMessage}${code}${status}${cause}`
         );
     }
 

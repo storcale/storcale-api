@@ -57,6 +57,7 @@ jobs:
           NOTIFY_URL: ${{ secrets.NOTIFY_URL }}
           ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
           VG_MAINFRAME: ${{ secrets.VG_MAINFRAME }}
+          GSA_KEY: ${{ secrets.GSA_KEY }}
         run: |
           set -o pipefail
           bunx jest --config jest.config.cjs --runInBand --timeout=30000 2>&1 | tee test-output.txt
