@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const router = express.Router();
-const storePath = path.join(__dirname, 'store.log'); // Store to follow data across time
+const storePath = path.join(__dirname, 'store.json'); // Store to follow data across time
 const axios = require('axios');
 const fs = require('fs');
 
