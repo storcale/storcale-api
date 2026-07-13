@@ -20,7 +20,7 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Create GSA file
         run: |
-          echo "${{ secrets.GSA_KEY }}" > gsa-key.json
+          echo "${{ secrets.GSA_KEY }}" > gsaKey.json
       - name: Run tests
         id: tests
         continue-on-error: true
