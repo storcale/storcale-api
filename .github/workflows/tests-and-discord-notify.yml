@@ -31,7 +31,7 @@ jobs:
         if: steps.checkout.outcome == 'success'
         env:
           GSA_KEY: ${{ secrets.GSA_KEY }}
-          MATCHES_LOG_SAMPLE: ${{ secrets.matchesLogSample }}
+          MATCHES_LOG_SAMPLE: ${{ secrets.MATCHESLOGSAMPLE }}
         run: |
           python - <<'PY'
           import os
@@ -41,8 +41,11 @@ jobs:
           Path('envs').mkdir(parents=True, exist_ok=True)
           Path('routes/tniv/DB/match').mkdir(parents=True, exist_ok=True)
 
-          with open('envs/gsaKey.json', 'w', encoding='utf-8') as fh:
+          with open('envs/gsaKey.env.json', 'w', encoding='utf-8') as fh:
               fh.write(os.environ.get('GSA_KEY', ''))
+
+          gsa_size = Path('envs/gsaKey.env.json').stat().st_size
+          print(f"Wrote envs/gsaKey.env.json ({gsa_size} bytes, GSA_KEY secret {'set' if os.environ.get('GSA_KEY') else 'EMPTY'})")
 
           with open('routes/tniv/DB/match/matches.log', 'w', encoding='utf-8') as fh:
               fh.write(os.environ.get('MATCHES_LOG_SAMPLE', ''))
