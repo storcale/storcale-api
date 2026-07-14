@@ -2,3 +2,4 @@
 node_modules
 *.log
 utils/signature.js
+routes/tniv/group/membercount/store.json

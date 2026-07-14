@@ -197,6 +197,10 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
     if (!req.originalUrl.startsWith('/api/')) return next();
 
+    if (['test', 'github'].includes(String(process.env.NODE_ENV || '').toLowerCase())) {
+        return next();
+    }
+
     const apiKey = req.get('api-key') || req.query?.['api-key'] || 'none';
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     const identifier = apiKey && apiKey !== 'none' ? `key:${apiKey}` : `ip:${clientIp}`;

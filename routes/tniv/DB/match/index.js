@@ -78,6 +78,82 @@ router.post('/', (req, res) => {
 /**
  * @swagger
  * /tniv/DB/match:
+ *   delete:
+ *     summary: Delete match entries.
+ *     security:
+ *       - apiKey: []
+ *     tags:
+ *       - TNIV/DB
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - sessionId
+ *             properties:
+ *               sessionId:
+ *                 type: string
+ *                 description: Unique session identifier
+ *             additionalProperties: true
+ *     responses:
+ *       200:
+ *         description: Match entry deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 body:
+ *                   type: string
+ *                   example: Deleted!
+ *                 code:
+ *                   type: string
+ *                   description: The sessionId of the logged match
+ *       400:
+ *         description: Invalid match data
+ *       401:
+ *         description: No api-key provided
+ *       403:
+ *         description: Invalid api-key for resource
+ *       500:
+ *         description: Server error
+ */
+router.delete('/', (req, res) => {
+    const { sessionId } = req.body;
+    if (!sessionId) {
+        return res.status(400).json({ error: 'sessionId is required' });
+    }
+
+    fs.readFile(logFilePath, 'utf8', (err, data) => {
+        if (err) {
+            console.error('Error reading log file:', err);
+            return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        const lines = data.split('\n').filter(line => line.trim() !== '');
+        const filteredLines = lines.filter(line => {
+            try {
+                const match = JSON.parse(line);
+                return match.sessionId !== sessionId;
+            } catch {
+                return true;
+            }
+        });
+    fs.writeFile(logFilePath, filteredLines.join('\n') + '\n', (err) => {
+            if (err) {
+                console.error('Error writing to log file:', err);
+                return res.status(500).json({ error: 'Internal server error' });
+            }
+            return res.status(200).json({ body: 'Deleted entries with sessionId: ' + sessionId, code: sessionId });
+        });
+    });
+});
+
+/**
+ * @swagger
+ * /tniv/DB/match:
  *   get:
  *     summary: Get all matches or filter by sessionId.
  *     security:
