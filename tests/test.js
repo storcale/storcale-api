@@ -51,7 +51,7 @@ afterAll(async () => {
     log(logLine);
 
     try {
-        if(process.env.NODE_ENV !== "test") {
+        if(process.env.NODE_ENV !== "development") {
         await agent
             .post("/api/admin/notify")
             .send({
