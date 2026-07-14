@@ -23,6 +23,7 @@
     "glob": "^11.0.3",
     "googleapis": "^154.1.0",
     "jest": "^30.4.2",
+    "pm2": "^7.0.3",
     "superagent": "^10.3.0",
     "supertest": "^7.2.2",
     "swagger-jsdoc": "^6.2.8",
