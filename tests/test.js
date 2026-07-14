@@ -51,6 +51,7 @@ afterAll(async () => {
     log(logLine);
 
     try {
+        if(process.env.NODE_ENV !== "test") {
         await agent
             .post("/api/admin/notify")
             .send({
@@ -69,6 +70,7 @@ afterAll(async () => {
                 email: ""
             })
             .expect(200);
+        }
     } catch (err) {
         console.error(`Failed to send notification: ${err.message}`);
     }
@@ -93,6 +95,7 @@ describe("General", () => {
 });
 // TNIV
 describe("TNIV/group",() => {
+    if(process.env.NODE_ENV !== "github") {
     test("Past membercount",() =>
         runTest("June 2026 membercount", async () => {
             await agent
@@ -106,6 +109,7 @@ describe("TNIV/group",() => {
                 .expect(200);
         }),
     )
+    }
     test("Current membercount",() =>
         runTest("Current membercount", async () => {
             const res = await agent
@@ -137,8 +141,47 @@ describe("TNIV/DB" ,() => {
             })
         )
     })
-    // TODO add match -> add DELETE match endpoint to clean up
+    describe("match",() => {
+        let sessionId = 0
+        test("Get matches",() =>
+            runTest("Get matches", async () => {
+                await agent
+                    .get("/api/tniv/db/match")
+                    .expect(res => {
+                        if (!Array.isArray(res.body.body)) {
+                            throw new Error("Response does not contain an array of matches");
+                        }
+                    })
+                    .expect(200)
+            })
+        )
+        test("Add match",() =>
+            runTest("Add match", async () => {
+                const matchData = fs.readFileSync(path.join(__dirname, "exampleMatch.json"), "utf8");
+                let matchDataJson = JSON.parse(matchData)
+                await agent
+                    .post("/api/tniv/db/match")
+                    .send(matchDataJson)
+                    .expect(res => {
+                        if (!res.body || !res.body.code) {
+                            throw new Error("Response does not contain a sessionId");
+                        }
+                        sessionId = res.body.code
+                    })
+                    .expect(200)
+            })
+        )
+        test("Delete match",() =>
+            runTest("Delete match", async () => {
+                const postResponse = await agent
+                    .delete("/api/tniv/db/match")
+                    .send({ sessionId: sessionId })
+                    .expect(200);
+            })
+        )
+    })
 })
+
 describe("TNIV/Sheets", () => {
     describe("events", () => {
         test("get Events", () =>

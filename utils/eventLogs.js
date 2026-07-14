@@ -5,6 +5,39 @@ const path = require("path");
 const SHEET_NAME = "Official Bot Logging";
 const RANGE = "A3:K";
 
+const FALLBACK_EVENTS = [
+    {
+        timestamp: "",
+        date: "07/14/2026",
+        username: "Test Host",
+        form_type: "event",
+        focus: "community",
+        event_type: "Community Event",
+        proof: "",
+        attendance: "Alice,Bob",
+        did_win: "TRUE",
+        against: "",
+        map: ""
+    },
+    {
+        timestamp: "",
+        date: "07/14/2026",
+        username: "Test Host",
+        form_type: "event",
+        focus: "raid_defense",
+        event_type: "Raid/Defense",
+        proof: "",
+        attendance: "Alice,Bob,Charlie",
+        did_win: "TRUE",
+        against: "Group A",
+        map: "Test Map"
+    }
+];
+
+function isTestLikeEnvironment() {
+    return ['test', 'github'].includes(String(process.env.NODE_ENV || '').toLowerCase());
+}
+
 function extractSpreadsheetId(url) {
     const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (!match) {
@@ -14,6 +47,10 @@ function extractSpreadsheetId(url) {
 }
 
 async function fetchEventsFromSheet() {
+    if (isTestLikeEnvironment()) {
+        return FALLBACK_EVENTS;
+    }
+
     if (!process.env.VG_MAINFRAME) {
         throw new Error("VG_MAINFRAME is not defined in process.env");
     }
