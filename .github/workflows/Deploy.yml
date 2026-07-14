@@ -16,4 +16,4 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          script: bash ~/storcale/storcale-api/deploy.sh
+          script: bash ~/storcale-api/deploy.sh
