@@ -21,7 +21,7 @@ function formatPlayerLines(players) {
     if (!players.length) return '*No players*';
     return players
         .sort((a, b) => b.kills - a.kills)
-        .map(p => `${p.displayName} ‣ ${p.kills}-${p.deaths}`)
+        .map(p => `${p.username} ‣ ${p.kills}-${p.deaths}`)
         .join('\n');
 }
 
@@ -88,7 +88,7 @@ function buildEmbed(match) {
     if (vanguardMembers.length) {
         embed.fields.push({
             name:   `${defenderName} Group Members`,
-            value:  vanguardMembers.map(p => p.displayName).join('\n'),
+            value:  vanguardMembers.map(p => p.username).join('\n'),
             inline: false,
         });
     }
