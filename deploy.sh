@@ -1,9 +1,6 @@
 #!/bin/bash
 set -e
 
-APP_DIR="/storcale/storcale-api"
-
-cd "$APP_DIR"
 git pull
 bun install
 bun run test
