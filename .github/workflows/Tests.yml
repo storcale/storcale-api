@@ -66,6 +66,7 @@ jobs:
           VG_MAINFRAME: ${{ secrets.VG_MAINFRAME }}
           NODE_OPTIONS: --experimental-vm-modules
           OFFICE_CODE: ${{ secrets.OFFICE_CODE }}
+          KEYWORDS: ${{ secrets.KEYWORDS }}
         run: |
           set +e
           set -o pipefail
@@ -116,7 +117,6 @@ jobs:
           SETUP_BUN_OUTCOME: ${{ steps.setup_bun.outcome }}
           INSTALL_OUTCOME: ${{ steps.install.outcome }}
           CREATEFILES_OUTCOME: ${{ steps.createfiles.outcome }}
-          OFFICE_CODE: ${{ secrets.OFFICE_CODE }}
         run: |
           python - <<'PY'
           import json
