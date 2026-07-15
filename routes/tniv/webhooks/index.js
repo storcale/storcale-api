@@ -188,15 +188,24 @@ router.post('/', async (req, res) => {
     const content = body.content || '';
     let keywords = process.env.KEYWORDS;
     if (typeof keywords === 'string') {
+        // Shit cuz github actions shenanigans
         try {
             keywords = JSON.parse(keywords);
-        } catch(e) {
-            throw new Error("KEYWORDS environment variable is not a valid JSON array.");
+        } catch (e1) {
+            try {
+                
+                keywords = JSON.parse(keywords.replace(/'/g, '"'));
+            } catch (e2) {
+                
+                const raw = String(keywords).replace(/^\[|\]$/g, '');
+                keywords = raw.split(',')
+                    .map(k => k.trim().replace(/^['\"]|['\"]$/g, ''))
+                    .filter(Boolean);
+            }
         }
     }
-    if (!Array.isArray(keywords)) {
-        keywords = [];
-    }
+    if (!Array.isArray(keywords)) keywords = [];
+
     if (keywords.some(k => k && content.includes(k))) {
         hasKeyword = true;
     } else if (Array.isArray(body.embeds)) {
