@@ -141,7 +141,7 @@ function cleanPayload(payload) {
     return cleaned;
 }
 
-
+const whitelistedIds = process.env.WHITELISTED_IDS || []
 function containsPing(obj) {
     const pingRegex = /<@([&]?)(\d+)>|@everyone|@here/;
     if (typeof obj === 'string') {
@@ -150,9 +150,9 @@ function containsPing(obj) {
         while ((match = pingRegex.exec(str)) !== null) {
             if (match[0] === '@everyone' || match[0] === '@here') return true;
             const id = match[2];
-            if (!process.env.WHITELISTED_IDS.includes(id)) return true;
+            if (!whitelistedIds.includes(id)) return true;
             str = str.slice(match.index + match[0].length);
-            whitelised = true
+            whitelisted = true
         }
         return false;
     }
@@ -185,7 +185,7 @@ router.post('/', async (req, res) => {
 
     const hasPing = containsPing(body);
     const content = body.content || '';
-    let keywords = process.env.KEYWORDS;
+    let keywords = process.env.KEYWORDS || [];
     if (typeof keywords === 'string') {
         try {
             keywords = JSON.parse(keywords.replace(/'/g, '"'));
@@ -202,7 +202,7 @@ router.post('/', async (req, res) => {
     const isDuplicate = lastWebhookContent === JSON.stringify(body);
     
     if (hasPing || !hasKeyword || isDuplicate) {
-        if (isDuplicate) {
+        if (isDuplicate && NODE_ENV === 'production') {
             notifyDeniedWebhook(hasPing, hasKeyword, isDuplicate, info)
         }
         lastWebhookContent = JSON.stringify(body);

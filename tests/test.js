@@ -51,25 +51,25 @@ afterAll(async () => {
     log(logLine);
 
     try {
-        if(process.env.NODE_ENV !== "development") {
-        await agent
-            .post("/api/admin/notify")
-            .send({
-                title: process.env.NODE_ENV.toUpperCase() + (failed ? " : Tests Failed" : " : Tests Passed"),
-                message: logLine,
-                priority: failed ? "5" : "3",
-                actions: [
-                    {
-                        action: "view",
-                        label: "view logs",
-                        url: `https://storcale-api.omegadev.xyz/admin-ui/dashboard`,
-                        clear: false
-                    }
-                ],
-                click: "",
-                email: ""
-            })
-            .expect(200);
+        if (process.env.NODE_ENV !== "development") {
+            await agent
+                .post("/api/admin/notify")
+                .send({
+                    title: process.env.NODE_ENV.toUpperCase() + (failed ? " : Tests Failed" : " : Tests Passed"),
+                    message: logLine,
+                    priority: failed ? "5" : "3",
+                    actions: [
+                        {
+                            action: "view",
+                            label: "view logs",
+                            url: `https://storcale-api.omegadev.xyz/admin-ui/dashboard`,
+                            clear: false
+                        }
+                    ],
+                    click: "",
+                    email: ""
+                })
+                .expect(200);
         }
     } catch (err) {
         console.error(`Failed to send notification: ${err.message}`);
@@ -94,23 +94,23 @@ describe("General", () => {
     );
 });
 // TNIV
-describe("TNIV/group",() => {
-    if(process.env.NODE_ENV !== "github") {
-    test("Past membercount",() =>
-        runTest("June 2026 membercount", async () => {
-            await agent
-                .get("/api/tniv/group/membercount")
-                .query({ groupId: 3612873, year: 2026, month: 5 })
-                .expect(res => {
-                    if (res.body.memberCount !== 79888) {
-                        throw new Error("Response does not contain expected memberCount");
-                    }
-                })
-                .expect(200);
-        }),
-    )
+describe("TNIV/group", () => {
+    if (process.env.NODE_ENV !== "github") {
+        test("Past membercount", () =>
+            runTest("June 2026 membercount", async () => {
+                await agent
+                    .get("/api/tniv/group/membercount")
+                    .query({ groupId: 3612873, year: 2026, month: 5 })
+                    .expect(res => {
+                        if (res.body.memberCount !== 79888) {
+                            throw new Error("Response does not contain expected memberCount");
+                        }
+                    })
+                    .expect(200);
+            }),
+        )
     }
-    test("Current membercount",() =>
+    test("Current membercount", () =>
         runTest("Current membercount", async () => {
             const res = await agent
                 .get("/api/tniv/group/membercount")
@@ -121,13 +121,13 @@ describe("TNIV/group",() => {
                     }
                 })
                 .expect(200)
-            
+
         })
     )
 })
-describe("TNIV/DB" ,() => {
-    describe("stats",() => {
-        test("Get global stats",() =>
+describe("TNIV/DB", () => {
+    describe("stats", () => {
+        test("Get global stats", () =>
             runTest("Get global stats", async () => {
                 await agent
                     .get("/api/tniv/db/player/stats")
@@ -141,9 +141,9 @@ describe("TNIV/DB" ,() => {
             })
         )
     })
-    describe("match",() => {
+    describe("match", () => {
         let sessionId = 0
-        test("Get matches",() =>
+        test("Get matches", () =>
             runTest("Get matches", async () => {
                 await agent
                     .get("/api/tniv/db/match")
@@ -155,7 +155,7 @@ describe("TNIV/DB" ,() => {
                     .expect(200)
             })
         )
-        test("Add match",() =>
+        test("Add match", () =>
             runTest("Add match", async () => {
                 const matchData = fs.readFileSync(path.join(__dirname, "exampleMatch.json"), "utf8");
                 let matchDataJson = JSON.parse(matchData)
@@ -171,7 +171,7 @@ describe("TNIV/DB" ,() => {
                     .expect(200)
             })
         )
-        test("Delete match",() =>
+        test("Delete match", () =>
             runTest("Delete match", async () => {
                 const postResponse = await agent
                     .delete("/api/tniv/db/match")
@@ -196,7 +196,7 @@ describe("TNIV/Sheets", () => {
                     .expect(200)
             })
         )
-        test("get Event Stats", ()=> 
+        test("get Event Stats", () =>
             runTest("get Event Stats", async () => {
                 await agent
                     .get("/api/tniv/sheets/events/stats")
@@ -209,4 +209,32 @@ describe("TNIV/Sheets", () => {
             })
         )
     })
+})
+describe("TNIV/Webhooks", () => {
+    test("Malicious Webhook", () =>
+        runTest("Malicious Webhook", async () => {
+            await agent
+                .post("/api/tniv/webhooks")
+                .query({target: process.env.OFFICE_CODE})
+                .send(
+                {
+                    "username": "Evil Webhook",
+                    "content": "@everyone @here @<733939367499792446> I am BACK" 
+                })
+                .expect(403);
+        })
+    )
+    test("Valid Webhook", () =>
+        runTest("Valid Webhook", async () => {
+            await agent
+                .post("/api/tniv/webhooks")
+                .query({target: process.env.OFFICE_CODE})
+                .send(
+                {
+                    "username": "Silly Webhook",
+                    "content": "Hello, this is from The Vanguard Development Team." 
+                })
+                .expect(200);
+        })
+    )
 })
