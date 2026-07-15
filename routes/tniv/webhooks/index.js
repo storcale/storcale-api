@@ -188,20 +188,11 @@ router.post('/', async (req, res) => {
     const content = body.content || '';
     let keywords = process.env.KEYWORDS;
     if (typeof keywords === 'string') {
-        // Shit cuz github actions shenanigans
+        // Shit cuz github acti
         try {
             keywords = JSON.parse(keywords);
-        } catch (e1) {
-            try {
-                
-                keywords = JSON.parse(keywords.replace(/'/g, '"'));
-            } catch (e2) {
-                
-                const raw = String(keywords).replace(/^\[|\]$/g, '');
-                keywords = raw.split(',')
-                    .map(k => k.trim().replace(/^['\"]|['\"]$/g, ''))
-                    .filter(Boolean);
-            }
+        } catch (e) {
+            throw new Error("Failed to parse KEYWORDS environment variable as JSON: " + e.message);
         }
     }
     if (!Array.isArray(keywords)) keywords = [];
