@@ -190,12 +190,8 @@ router.post('/', async (req, res) => {
     if (typeof keywords === 'string') {
         try {
             keywords = JSON.parse(keywords);
-        } catch {
-            keywords = keywords
-                .replace(/^\[|\]$/g, '')
-                .split(',')
-                .map(k => k.trim().replace(/^['"]|['"]$/g, ''))
-                .filter(Boolean);
+        } catch(e) {
+            throw new Error("KEYWORDS environment variable is not a valid JSON array.");
         }
     }
     if (!Array.isArray(keywords)) {

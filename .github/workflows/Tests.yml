@@ -36,6 +36,7 @@ jobs:
         env:
           GSA_KEY: ${{ secrets.GSA_KEY }}
           MATCHES_LOG_SAMPLE: ${{ secrets.MATCHESLOGSAMPLE }}
+          KEYWORDS: ${{ secrets.KEYWORDS }}
         run: |
           python - <<'PY'
           import os
@@ -50,6 +51,9 @@ jobs:
 
           gsa_size = Path('envs/gsaKey.env.json').stat().st_size
           print(f"Wrote envs/gsaKey.env.json ({gsa_size} bytes, GSA_KEY secret {'set' if os.environ.get('GSA_KEY') else 'EMPTY'})")
+          
+          with open('envs/webhook.env.json', 'w', encoding='utf-8') as fh:
+              fh.write(os.environ.get('KEYWORDS', ''))
 
           with open('routes/tniv/DB/match/matches.log', 'w', encoding='utf-8') as fh:
               fh.write(os.environ.get('MATCHES_LOG_SAMPLE', ''))
@@ -66,7 +70,6 @@ jobs:
           VG_MAINFRAME: ${{ secrets.VG_MAINFRAME }}
           NODE_OPTIONS: --experimental-vm-modules
           OFFICE_CODE: ${{ secrets.OFFICE_CODE }}
-          KEYWORDS: ${{ secrets.KEYWORDS }}
         run: |
           set +e
           set -o pipefail
