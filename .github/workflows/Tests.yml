@@ -52,7 +52,7 @@ jobs:
           gsa_size = Path('envs/gsaKey.env.json').stat().st_size
           print(f"Wrote envs/gsaKey.env.json ({gsa_size} bytes, GSA_KEY secret {'set' if os.environ.get('GSA_KEY') else 'EMPTY'})")
           
-          with open('envs/webhook.env.json', 'w', encoding='utf-8') as fh:
+          with open('envs/webhook.env', 'w', encoding='utf-8') as fh:
               fh.write(os.environ.get('KEYWORDS', ''))
 
           with open('routes/tniv/DB/match/matches.log', 'w', encoding='utf-8') as fh:
