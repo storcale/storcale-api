@@ -4,6 +4,7 @@ const axios = require('axios');
 const path = require('path');
 const querystring = require('node:querystring');
 const { error } = require('node:console');
+const env = String(process.env.NODE_ENV || 'development').toLowerCase();
 let lastWebhookContent = null;
 const { notifyDeniedWebhook } = require(path.join(global.__basedir, "utils/notify.js"))
 
@@ -185,24 +186,31 @@ router.post('/', async (req, res) => {
 
     const hasPing = containsPing(body);
     const content = body.content || '';
-    let keywords = process.env.KEYWORDS || [];
+    let keywords = process.env.KEYWORDS;
     if (typeof keywords === 'string') {
         try {
-            keywords = JSON.parse(keywords.replace(/'/g, '"'));
+            keywords = JSON.parse(keywords);
         } catch {
-            keywords = [];
+            keywords = keywords
+                .replace(/^\[|\]$/g, '')
+                .split(',')
+                .map(k => k.trim().replace(/^['"]|['"]$/g, ''))
+                .filter(Boolean);
         }
     }
-    if (Array.isArray(keywords) && keywords.some(k => k && content.includes(k))) {
+    if (!Array.isArray(keywords)) {
+        keywords = [];
+    }
+    if (keywords.some(k => k && content.includes(k))) {
         hasKeyword = true;
     } else if (Array.isArray(body.embeds)) {
-        hasKeyword = body.embeds.some(e => e.footer && typeof e.footer.text === 'string' && Array.isArray(keywords) && keywords.some(k => k && e.footer.text.includes(k)));
+        hasKeyword = body.embeds.some(e => e.footer && typeof e.footer.text === 'string' && keywords.some(k => k && e.footer.text.includes(k)));
     }
 
     const isDuplicate = lastWebhookContent === JSON.stringify(body);
     
     if (hasPing || !hasKeyword || isDuplicate) {
-        if (isDuplicate && NODE_ENV === 'production') {
+        if (isDuplicate && env === 'production') {
             notifyDeniedWebhook(hasPing, hasKeyword, isDuplicate, info)
         }
         lastWebhookContent = JSON.stringify(body);
