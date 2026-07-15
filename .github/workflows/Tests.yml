@@ -64,6 +64,7 @@ jobs:
           ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
           VG_MAINFRAME: ${{ secrets.VG_MAINFRAME }}
           NODE_OPTIONS: --experimental-vm-modules
+          OFFICE_CODE: ${{ secrets.OFFICE_CODE }}
         run: |
           set +e
           set -o pipefail
