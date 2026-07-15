@@ -1,9 +1,7 @@
-async function sendDeploymentWebhook({ loadRoutesTimeMs, environment = process.env.NODE_ENV || 'unknown' } = {}) {
-    const webhookUrl = process.env.WEBHOOK;
-    if (!webhookUrl) return null;
+const {notify} = require('./notify');
 
-    const isProduction = String(environment).toLowerCase() === 'production';
-    if (!isProduction) return null;
+async function sendDeploymentStatus({ loadRoutesTimeMs, environment = process.env.NODE_ENV || 'unknown' } = {}) {
+    const webhookUrl = process.env.WEBHOOK;
 
     const payload = {
         embeds: [
@@ -34,7 +32,11 @@ async function sendDeploymentWebhook({ loadRoutesTimeMs, environment = process.e
         throw new Error(`Deployment webhook failed (${response.status}): ${text}`);
     }
 
-    return response.text();
+    // notification
+    // (title, message, priority, actions, click, email
+    await notify('Deployment', 'Deployment successful on ' + environment + " in " + loadRoutesTimeMs + "ms",3).catch(console.error);
+    console.log('Deployment status sent successfully.');
+    return response;
 }
 
-module.exports = { sendDeploymentWebhook };
+module.exports = { sendDeploymentStatus };

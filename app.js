@@ -5,8 +5,9 @@ const path = require('path');
 const glob = require('glob');
 const loadRoutes = require('./utils/loadRoutes');
 const { loadApiKeysConfig } = require('./utils/apiKeys');
-const { sendDeploymentWebhook } = require('./utils/deploymentWebhook');
+const { sendDeploymentStatus } = require('./utils/sendDeploymentStatus');
 const querystring = require('node:querystring');
+const env = String(process.env.NODE_ENV || 'development').toLowerCase();
 app.use(express.json());
 global.__basedir = `${__dirname}`;
 
@@ -197,7 +198,7 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
     if (!req.originalUrl.startsWith('/api/')) return next();
 
-    if (['test', 'github'].includes(String(process.env.NODE_ENV || '').toLowerCase())) {
+    if (['test', 'github'].includes(env)) {
         return next();
     }
 
@@ -238,10 +239,10 @@ loadRoutes(app, path.join(__dirname, 'routes'), apiKeysJson);
 console.timeEnd('loadRoutes');
 const loadRoutesDurationMs = Date.now() - loadRoutesStart;
 
-if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
-    sendDeploymentWebhook({
+if (env === 'production') {
+    sendDeploymentStatus({
         loadRoutesTimeMs: loadRoutesDurationMs,
-        environment: process.env.NODE_ENV,
+        environment: env,
     }).catch((error) => {
         console.error('Deployment webhook failed:', error.message || error);
     });

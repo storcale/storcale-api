@@ -11,7 +11,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.11.1",
+  "packageManager": "bun",
   "dependencies": {
     "Math": "0.0.1-security",
     "axios": "^1.11.0",
