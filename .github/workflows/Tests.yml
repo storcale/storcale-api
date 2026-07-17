@@ -142,7 +142,7 @@ jobs:
           if os.path.exists(test_output_path):
               with open(test_output_path, "r", encoding="utf-8", errors="ignore") as fh:
                   lines = [line.rstrip() for line in fh.readlines() if line.strip()]
-              summary = "\n".join(lines[-20:]) if lines else summary
+              summary = "\n".join(lines[-23:]) if lines else summary
           else:
               step_summary = []
               for label, env_name in [
