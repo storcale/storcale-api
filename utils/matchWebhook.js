@@ -13,6 +13,7 @@ function normalisePlayers(playerList) {
         displayName: p.displayName || p.username || String(p.userId),
         kills:       getStat(p, 'Kills'),
         deaths:      getStat(p, 'Deaths'),
+        ping:        getStat(p, 'Ping'),
         isVanguard:  p.isVanguard === true,
     }));
 }
@@ -21,7 +22,7 @@ function formatPlayerLines(players) {
     if (!players.length) return '*No players*';
     return players
         .sort((a, b) => b.kills - a.kills)
-        .map(p => `${p.username} ‣ ${p.kills}-${p.deaths}`)
+        .map(p => `${p.username} ‣ ${p.kills}-${p.deaths} _(${p.ping}ms)_`)
         .join('\n');
 }
 
@@ -61,7 +62,7 @@ function buildEmbed(match) {
         title:       gameName,
         url:         gameUrl,
         description: `**${winnerName}** HAVE WON THE GAME!`,
-        color:       winner === 'attackers' ? 0xe50000 : 0xff5500,
+        color:       winner === 'vanguards' ?  0xff5500: 0xe50000,
         fields: [
             {
                 name:   'Points',

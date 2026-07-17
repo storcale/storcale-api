@@ -65,7 +65,7 @@ router.post('/', (req, res) => {
 
         if (matchData.sendWebhook) {
             sendMatchWebhook(matchData, {
-                baseUrl: 'https://storcale-api.omegadev.xyz',
+                baseUrl: process.env.NODE_ENV == 'production'? "https://storcale-api.omegadev.xyz" : "http://localhost:9902",
                 target:  process.env.MatchLogWebhookTarget,  
                 apiKey:  process.env.ADMIN_KEY,
             }).catch(e => console.error('[matchWebhook] Failed:', e?.response?.data || e?.message));
