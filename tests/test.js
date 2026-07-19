@@ -78,7 +78,7 @@ afterAll(async () => {
     }
 
     if (
-        process.env.NODE_ENV !== "development" &&
+        agent && process.env.NODE_ENV !== "development" &&
         process.env.NODE_ENV !== "test"
     ) {
         try {
