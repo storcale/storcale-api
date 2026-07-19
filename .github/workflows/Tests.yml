@@ -63,6 +63,7 @@ jobs:
           NOTIFY_URL: ${{ secrets.NOTIFY_URL }}
           ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
           VG_MAINFRAME: ${{ secrets.VG_MAINFRAME }}
+          DB_URL: ${{ secrets.DB_URL }}
           NODE_OPTIONS: --experimental-vm-modules
         run: |
           set +e

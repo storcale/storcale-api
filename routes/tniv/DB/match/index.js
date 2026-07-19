@@ -1,8 +1,32 @@
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
 const path = require('path');
-const logFilePath = path.join(__dirname, 'matches.log');
+const Match = require(path.join(global.__basedir, 'db/schemas/match.js'));
+const PlayerStat = require(path.join(global.__basedir, 'db/schemas/playerStat.js'));
+const { extractPlayerDeltas } = require(path.join(global.__basedir, 'utils/matchStats.js'));
+const { sendMatchWebhook } = require(path.join(global.__basedir, 'utils/matchWebhook.js'));
+
+async function applyPlayerDeltas(matchData, sign = 1) {
+    const deltas = extractPlayerDeltas(matchData);
+    for (const d of deltas) {
+        await PlayerStat.findOneAndUpdate(
+            { userId: d.userId },
+            {
+                $setOnInsert: { userId: d.userId },
+                $set: { username: d.username },
+                $inc: {
+                    kills: sign * d.kills,
+                    deaths: sign * d.deaths,
+                    playTimeSec: sign * d.playTimeSec,
+                    matchesPlayed: sign * 1,
+                    totalPing: sign * d.ping,
+                    pingSamples: sign * (d.ping ? 1 : 0),
+                },
+            },
+            { upsert: true }
+        );
+    }
+}
 
 /**
  * @swagger
@@ -29,17 +53,6 @@ const logFilePath = path.join(__dirname, 'matches.log');
  *     responses:
  *       200:
  *         description: Match entry logged
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 body:
- *                   type: string
- *                   example: Logged!
- *                 code:
- *                   type: string
- *                   description: The sessionId of the logged match
  *       400:
  *         description: Invalid match data
  *       401:
@@ -49,30 +62,38 @@ const logFilePath = path.join(__dirname, 'matches.log');
  *       500:
  *         description: Server error
  */
-const { sendMatchWebhook } = require(path.join(global.__basedir, 'utils/matchWebhook.js'));
-
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
     const matchData = req.body;
     if (!matchData || !matchData.sessionId) {
         return res.status(400).json({ error: 'Invalid match data' });
     }
 
-    fs.appendFile(logFilePath, JSON.stringify(matchData) + '\n', async (err) => {
-        if (err) {
-            console.error('Error writing to log file:', err);
-            return res.status(500).json({ error: 'Internal server error' });
-        }
+    try {
+        await Match.create({
+            sessionId: matchData.sessionId,
+            data: matchData,
+            matchStartTime: matchData.matchStartTime,
+            endTime: matchData.endTime,
+        });
+
+        await applyPlayerDeltas(matchData, 1);
 
         if (matchData.sendWebhook) {
             sendMatchWebhook(matchData, {
-                baseUrl: process.env.NODE_ENV == 'production'? "https://storcale-api.omegadev.xyz" : "http://localhost:9902",
-                target:  process.env.MatchLogWebhookTarget,  
-                apiKey:  process.env.ADMIN_KEY,
+                baseUrl: process.env.NODE_ENV === 'production' ? 'https://storcale-api.omegadev.xyz' : 'http://localhost:9902',
+                target: process.env.MatchLogWebhookTarget,
+                apiKey: process.env.ADMIN_KEY,
             }).catch(e => console.error('[matchWebhook] Failed:', e?.response?.data || e?.message));
         }
-        matchCode = matchData.sessionId || '';
-        return res.status(200).json({ body: 'Logged!',code:matchCode });
-    });
+
+        return res.status(200).json({ body: 'Logged!', code: matchData.sessionId });
+    } catch (err) {
+        if (err.code === 11000) {
+            return res.status(400).json({ error: `Match with sessionId ${matchData.sessionId} already exists.` });
+        }
+        console.error('Error logging match:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 /**
@@ -96,21 +117,9 @@ router.post('/', (req, res) => {
  *               sessionId:
  *                 type: string
  *                 description: Unique session identifier
- *             additionalProperties: true
  *     responses:
  *       200:
  *         description: Match entry deleted
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 body:
- *                   type: string
- *                   example: Deleted!
- *                 code:
- *                   type: string
- *                   description: The sessionId of the logged match
  *       400:
  *         description: Invalid match data
  *       401:
@@ -120,35 +129,24 @@ router.post('/', (req, res) => {
  *       500:
  *         description: Server error
  */
-router.delete('/', (req, res) => {
-    const { sessionId } = req.body;
+router.delete('/', async (req, res) => {
+    const { sessionId } = req.body || {};
     if (!sessionId) {
         return res.status(400).json({ error: 'sessionId is required' });
     }
 
-    fs.readFile(logFilePath, 'utf8', (err, data) => {
-        if (err) {
-            console.error('Error reading log file:', err);
-            return res.status(500).json({ error: 'Internal server error' });
+    try {
+        const match = await Match.findOne({ sessionId });
+        if (match) {
+            // reverse the player-stat contribution of this match before removing it
+            await applyPlayerDeltas(match.data, -1);
+            await Match.deleteOne({ sessionId });
         }
-
-        const lines = data.split('\n').filter(line => line.trim() !== '');
-        const filteredLines = lines.filter(line => {
-            try {
-                const match = JSON.parse(line);
-                return match.sessionId !== sessionId;
-            } catch {
-                return true;
-            }
-        });
-    fs.writeFile(logFilePath, filteredLines.join('\n') + '\n', (err) => {
-            if (err) {
-                console.error('Error writing to log file:', err);
-                return res.status(500).json({ error: 'Internal server error' });
-            }
-            return res.status(200).json({ body: 'Deleted entries with sessionId: ' + sessionId, code: sessionId });
-        });
-    });
+        return res.status(200).json({ body: 'Deleted entries with sessionId: ' + sessionId, code: sessionId });
+    } catch (err) {
+        console.error('Error deleting match:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 /**
@@ -170,68 +168,24 @@ router.delete('/', (req, res) => {
  *     responses:
  *       200:
  *         description: Match data successfully retrieved
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 body:
- *                   type: array
- *                   description: Array of match records
- *                   items:
- *                     type: object
- *       400:
- *         description: Invalid params
  *       401:
  *         description: No api-key provided
  *       403:
  *         description: Invalid api-key for resource
  *       500:
  *         description: Server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   description: Error message
  */
-router.get('/', (req, res) => {
-  const sessionId = req.query.sessionId;
-
-  fs.readFile(logFilePath, 'utf8', (err, data = '') => {
-    if (err) {
-      if (err.code === 'ENOENT') {
-        // file not created yet -> empty list
-        return res.status(200).json({ body: [] });
-      }
-      console.error('Error reading log file:', err);
-      return res.status(500).json({ error: 'Internal server error' });
+router.get('/', async (req, res) => {
+    try {
+        console.log("match accessed!")
+        const sessionId = req.query.sessionId;
+        const filter = sessionId ? { sessionId } : {};
+        const matches = await Match.find(filter).sort({ createdAt: 1 }).lean();
+        return res.status(200).json({ body: matches.map(m => m.data) });
+    } catch (err) {
+        console.error('Error reading matches:', err);
+        return res.status(500).json({ error: 'Internal server error' });
     }
-
-    const lines = data
-      .split('\n')
-      .filter((line) => line.trim() !== '');
-
-    let matches;
-    if (sessionId) {
-      const filtered = lines.filter((line) => line.includes(sessionId));
-      matches = filtered
-        .map((line) => {
-          try { return JSON.parse(line); } catch { return null; }
-        })
-        .filter((x) => x !== null);
-    } else {
-      matches = lines
-        .map((line) => {
-          try { return JSON.parse(line); } catch { return null; }
-        })
-        .filter((x) => x !== null);
-    }
-
-    return res.status(200).json({ body: matches });
-  });
 });
 
 module.exports = router;

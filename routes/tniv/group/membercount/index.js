@@ -1,9 +1,8 @@
 const express = require('express');
 const path = require('path');
 const router = express.Router();
-const storePath = path.join(__dirname, 'store.json'); // Store to follow data across time
 const axios = require('axios');
-const fs = require('fs');
+const MemberCount = require(path.join(global.__basedir, 'db/schemas/memberCount.js'));
 
 function parsePositiveInt(value, fallback) {
     const parsed = parseInt(value, 10);
@@ -17,7 +16,6 @@ function parseBoolean(value) {
 }
 
 async function getGroupMemberCount(groupId, month, year) {
-    const url = `https://groups.roblox.com/v1/groups/`;
     const date = new Date();
     const currentMonth = date.getMonth() + 1;
     const currentYear = date.getFullYear();
@@ -40,7 +38,7 @@ async function getGroupMemberCount(groupId, month, year) {
     if (targetMonth === currentMonth && targetYear === currentYear) {
         let response;
         try {
-            response = await axios.get(url + groupId, {
+            response = await axios.get(`https://groups.roblox.com/v1/groups/${groupId}`, {
                 headers: {
                     'Content-Type': 'application/json',
                     'apiKey': process.env.ROBLOX_API_KEY || '',
@@ -54,34 +52,23 @@ async function getGroupMemberCount(groupId, month, year) {
         }
 
         const result = response.data.memberCount;
-        const logEntry = {
-            groupId,
-            month: targetMonth,
-            year: targetYear,
-            memberCount: result,
-            timestamp: new Date().toISOString(),
-        };
         try {
-            fs.appendFileSync(storePath, JSON.stringify(logEntry) + '\n');
+            await MemberCount.create({
+                groupId: String(groupId),
+                month: targetMonth,
+                year: targetYear,
+                memberCount: result,
+                timestamp: new Date(),
+            });
         } catch (err) {
-            console.error('Failed to write to store:', err);
+            console.error('Failed to write member count to MongoDB:', err.message);
         }
         return result;
     }
 
-    const logData = fs.readFileSync(storePath, 'utf-8');
-    const entries = logData.split('\n').filter(line => line.trim() !== '');
-    let lastEntry = null;
-    for (const entry of entries) {
-        try {
-            const data = JSON.parse(entry);
-            if (data.groupId === groupId && data.month === targetMonth && data.year === targetYear) {
-                lastEntry = data;
-            }
-        } catch (err) {
-            console.error('Error parsing log entry:', err);
-        }
-    }
+    const lastEntry = await MemberCount.findOne({ groupId: String(groupId), month: targetMonth, year: targetYear })
+        .sort({ timestamp: -1 })
+        .lean();
     if (lastEntry) {
         return lastEntry.memberCount;
     }
@@ -134,94 +121,39 @@ async function getGroupMemberGrowth(groupId, fromMonth, fromYear, toMonth, toYea
  *         required: true
  *         schema:
  *           type: string
- *         description: The Roblox group ID
  *       - in: query
  *         name: month
- *         required: false
  *         schema:
  *           type: string
- *         description: The month (1-12), defaults to current month
  *       - in: query
  *         name: year
- *         required: false
  *         schema:
  *           type: string
- *         description: The year, defaults to current year
  *       - in: query
  *         name: growth
- *         required: false
  *         schema:
  *           type: boolean
- *         description: When true, returns growth information instead of only a single count
  *       - in: query
  *         name: fromMonth
- *         required: false
  *         schema:
  *           type: string
- *         description: The start month for growth calculation (1-12)
  *       - in: query
  *         name: fromYear
- *         required: false
  *         schema:
  *           type: string
- *         description: The start year for growth calculation, defaults to current year
  *       - in: query
  *         name: toMonth
- *         required: false
  *         schema:
  *           type: string
- *         description: The end month for growth calculation, defaults to current month
  *       - in: query
  *         name: toYear
- *         required: false
  *         schema:
  *           type: string
- *         description: The end year for growth calculation, defaults to current year
  *     responses:
  *       200:
  *         description: Successfully retrieved member count or growth data
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 memberCount:
- *                   type: number
- *                   description: The member count of the group for the requested month
- *                 fromMonth:
- *                   type: number
- *                 fromYear:
- *                   type: number
- *                 fromMemberCount:
- *                   type: number
- *                 toMonth:
- *                   type: number
- *                 toYear:
- *                   type: number
- *                 toMemberCount:
- *                   type: number
- *                 growth:
- *                   type: number
- *                   description: The difference between toMemberCount and fromMemberCount
- *                 growthPercent:
- *                   type: number
- *                   description: The percent change from the starting month to the target month
- *       400:
- *         description: Invalid params
  *       500:
  *         description: Server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   description: Error message string
- *       401:
- *         description: No api-key provided
- *       403:
- *         description: Invalid api-key for resource
  */
 router.get('/', async (req, res) => {
     try {
