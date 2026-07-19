@@ -87,10 +87,9 @@ function loadRoutes(app, routesDir, baseUrl = '/api') {
                         console.log(`Mounted PROTECTED route: ${baseUrl}/${endpointPath}`);
                     }
                 } catch (err) {
-                    console.error(`\n Failed to load route: ${baseUrl}/${endpointPath}`);
-                    console.error(`   File: ${fullPath}`);
-                    console.error(err.stack || err);
-                    console.error('----------------------------------------\n');
+                    console.warn(`\n Failed to load route: ${baseUrl}/${endpointPath}`);
+                    console.warn(`   File: ${fullPath}`);
+                    console.warn(err.stack || err);
                 }
             }
         });

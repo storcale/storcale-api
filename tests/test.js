@@ -2,7 +2,7 @@ const request = require("supertest");
 const app = require("../app");
 const fs = require("fs");
 const path = require("path");
-
+const disconnectDb = require(path.join(global.__basedir, 'db/db.js')).disconnectDB;
 const results = [];
 const logFilePath = path.join(__dirname, "../access.log");
 
@@ -53,9 +53,9 @@ afterAll(async () => {
             .join(", ");
 
     log(logLine);
-
+    disconnectDb().catch(err => console.error("Failed to disconnect from DB:", err.message));
     try {
-        if(process.env.NODE_ENV !== "development") {
+        if(process.env.NODE_ENV !== "development" || process.env.NODE_ENV !== "test") {
         await agent
             .post("/api/admin/notify")
             .send({
@@ -135,7 +135,7 @@ describe("TNIV/DB" ,() => {
             runTest("Get global stats", async () => {
                 await agent
                     .get("/api/tniv/db/player/stats")
-                    .query({ from: "01/01/2024", to: "06/30/2026" })
+                    .query({ from: "01/01/2024", to: "06/30/2028" })
                     .expect(res => {
                         if (typeof res.body.totalKills !== "number" || res.body.totalKills < 1) {
                             throw new Error("Response does not contain any kills : missing data?");

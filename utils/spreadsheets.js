@@ -1,6 +1,6 @@
 const { google } = require('googleapis');
 const path = require('path');
-const Spreadsheet = require(path.join(global.__basedir, 'models/Spreadsheet.js'));
+const Spreadsheet = require(path.join(global.__basedir, 'db/schemas/spreadsheet.js'));
 
 const auth = new google.auth.GoogleAuth({
     keyFile: path.join(global.__basedir, 'envs/gsaKey.env.json'),
