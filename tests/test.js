@@ -2,7 +2,6 @@ const request = require("supertest");
 const app = require("../app");
 const fs = require("fs");
 const path = require("path");
-const os = require("os");
 
 const results = [];
 const logFilePath = path.join(__dirname, "../access.log");
@@ -19,6 +18,11 @@ function log(message) {
 }
 const agent = request.agent(app)
     .set('api-key', process.env.ADMIN_KEY);
+
+
+beforeAll(async () => {
+    await app.init();
+}, 30000);
 
 async function runTest(name, fn) {
     try {

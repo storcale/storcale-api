@@ -3,54 +3,13 @@ const app = module.exports = express();
 const fs = require('fs');
 const path = require('path');
 const glob = require('glob');
-const loadRoutes = require('./utils/loadRoutes');
-const { loadApiKeysConfig } = require('./utils/apiKeys');
-const { sendDeploymentWebhook } = require('./utils/deploymentWebhook');
 const querystring = require('node:querystring');
+const env = String(process.env.NODE_ENV || 'development').toLowerCase();
 app.use(express.json());
 global.__basedir = `${__dirname}`;
 
-const bannedIpsPath = path.join(__dirname, '/envs/banned_ips.env.json');
-
-function readBannedIps() {
-    try {
-        if (!fs.existsSync(bannedIpsPath)) return {};
-        return JSON.parse(fs.readFileSync(bannedIpsPath, 'utf8') || '{}');
-    } catch (e) {
-        return {};
-    }
-}
-
-// Cache 
-let bannedIpsCache = readBannedIps();
-
 try {
-    fs.watch(bannedIpsPath, { persistent: false }, (eventType) => {
-        if (eventType === 'change' || eventType === 'rename') {
-            bannedIpsCache = readBannedIps();
-        }
-    });
-} catch (e) {
-
-}
-
-function writeBannedIps(obj) {
-    try {
-        fs.writeFileSync(bannedIpsPath, JSON.stringify(obj, null, 2));
-        bannedIpsCache = obj; // keep cache authoritative immediately, no re-read needed
-        return true;
-    } catch (e) {
-        return false;
-    }
-}
-
-const { notifyRateLimitExceeded } = require('./utils/notify');
-const rateLimitWindowSec = Number(process.env.RATE_LIMIT_WINDOW_SEC) || 60; // seconds
-const rateLimitMax = Number(process.env.RATE_LIMIT_MAX) || 60; // max requests per window
-const rateStore = new Map(); // ip -> array of epoch seconds
-
-try {
-    const dotenv = require('dotenv')
+    const dotenv = require('dotenv');
     dotenv.config({ path: path.join(__dirname, 'envs/.env') });
     dotenv.config({ path: path.join(__dirname, 'envs/webhook.env') });
     console.log('dotenv loaded');
@@ -58,8 +17,24 @@ try {
     console.error('Error loading .env:', error);
 }
 
-// Swagger setup
+const { connectDB } = require('./db/db');
+const {
+    refreshApiKeysCache,
+    getApiKeysCache,
+    startApiKeysAutoRefresh,
+} = require('./utils/apiKeys');
+const {
+    refreshBannedIpsCache,
+    getBannedIpsCache,
+    startBannedIpsAutoRefresh,
+} = require('./utils/bannedIps');
+const loadRoutes = require('./utils/loadRoutes');
+const { sendDeploymentStatus } = require('./utils/sendDeploymentStatus');
+const { notifyRateLimitExceeded } = require('./utils/notify');
 
+const rateStore = new Map(); // ip/key -> array of epoch seconds
+
+// Swagger setup
 const swaggerUi = require('swagger-ui-express');
 const swaggerJSDoc = require('swagger-jsdoc');
 
@@ -87,11 +62,7 @@ const swaggerDefinition = {
     ]
 };
 const apiFiles = glob.sync('routes/**/*.js');
-const swaggerOptions = {
-    swaggerDefinition,
-    apis: apiFiles,
-};
-const swaggerSpec = swaggerJSDoc(swaggerOptions);
+const swaggerSpec = swaggerJSDoc({ swaggerDefinition, apis: apiFiles });
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Admin UI routes
@@ -103,52 +74,30 @@ try {
     console.error('Failed to mount admin-ui routes', e);
 }
 
-// get api keys
-
-const { data: apiKeysJson } = loadApiKeysConfig(__dirname);
-
-
-const rateLimitCache = new Map();
-
 function getRateLimitsForKey(key) {
     const globalWindow = Number(process.env.RATE_LIMIT_WINDOW_SEC) || 60;
     const globalMax = Number(process.env.RATE_LIMIT_MAX) || 60;
-
     if (!key || key === 'none') return { windowSec: globalWindow, max: globalMax };
 
-    const cached = rateLimitCache.get(key);
-    if (cached) return cached;
-
-    let result = { windowSec: globalWindow, max: globalMax };
-    try {
-        for (const [name, entry] of Object.entries(apiKeysJson || {})) {
-            if (!entry || typeof entry !== 'object') continue;
-            if (entry.key === key || entry.apiKey === key || name === key) {
-                // support common field names and nested rateLimit object
-                const rawW = (entry.rateLimit && (entry.rateLimit.windowMs || entry.rateLimit.windowSec || entry.rateLimit.window)) ||
-                    entry.rateLimitWindowSec || entry.rateWindow || entry.window || entry.rate_window;
-                const rawM = (entry.rateLimit && (entry.rateLimit.limit || entry.rateLimit.max)) ||
-                    entry.rateLimitMax || entry.rateMax || entry.max || entry.rate_max;
-                const w = rawW !== undefined && rawW !== null ? Number(rawW) : null;
-                const m = rawM !== undefined && rawM !== null ? Number(rawM) : null;
-                // if window looks like milliseconds (>=1000), convert to seconds
-                const windowSec = w ? (w >= 1000 ? Math.floor(w / 1000) : w) : null;
-                result = { windowSec: windowSec || globalWindow, max: m || globalMax };
-                break;
-            }
+    const apiKeysJson = getApiKeysCache();
+    for (const entry of Object.values(apiKeysJson || {})) {
+        if (!entry || typeof entry !== 'object') continue;
+        if (entry.key === key) {
+            const rawW = entry.rateLimit?.windowMs;
+            const rawM = entry.rateLimit?.limit;
+            const w = rawW !== undefined && rawW !== null ? Number(rawW) : null;
+            const m = rawM !== undefined && rawM !== null ? Number(rawM) : null;
+            const windowSec = w ? (w >= 1000 ? Math.floor(w / 1000) : w) : null;
+            return { windowSec: windowSec || globalWindow, max: m || globalMax };
         }
-    } catch (e) {
-        // fall back to global
     }
-
-    rateLimitCache.set(key, result);
-    return result;
+    return { windowSec: globalWindow, max: globalMax };
 }
 
 app.use((req, res, next) => {
     if (!req.originalUrl.startsWith('/api/')) return next();
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-    if (bannedIpsCache[clientIp]) {
+    if (getBannedIpsCache()[clientIp]) {
         res.status(403).json({ error: 'You are banned.' });
         return;
     }
@@ -167,12 +116,11 @@ app.use((req, res, next) => {
     const body = req.body ? `- body: ${JSON.stringify(req.body)}` : '';
     const query = Object.keys(req.query).length > 0 ? querystring.stringify(req.query) : 'No Query';
     const host = req.get('host') || 'localhost';
-    const scheme =  req.protocol || 'http';
+    const scheme = req.protocol || 'http';
     const baseUrl = `${scheme}://${host}${req.path}`;
 
     res.on('finish', () => {
         const statusCode = res.statusCode;
-        //
         const now = Math.floor(Date.now() / 1000);
         const identifier = apiKey && apiKey !== 'none' ? `key:${apiKey}` : `ip:${clientIp}`;
         const arr = rateStore.get(identifier) || [];
@@ -197,7 +145,7 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
     if (!req.originalUrl.startsWith('/api/')) return next();
 
-    if (['test', 'github'].includes(String(process.env.NODE_ENV || '').toLowerCase())) {
+    if (['test', 'github'].includes(env)) {
         return next();
     }
 
@@ -208,7 +156,6 @@ app.use((req, res, next) => {
     const limits = getRateLimitsForKey(apiKey);
     const now = Math.floor(Date.now() / 1000);
     const arr = rateStore.get(identifier) || [];
-    // remove old entries
     const windowStart = now - limits.windowSec;
     const recent = arr.filter(t => t >= windowStart);
     recent.push(now);
@@ -231,26 +178,10 @@ app.use((req, res, next) => {
     next();
 });
 
-// Automatically load routes
-const loadRoutesStart = Date.now();
-console.time('loadRoutes');
-loadRoutes(app, path.join(__dirname, 'routes'), apiKeysJson);
-console.timeEnd('loadRoutes');
-const loadRoutesDurationMs = Date.now() - loadRoutesStart;
-
-if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
-    sendDeploymentWebhook({
-        loadRoutesTimeMs: loadRoutesDurationMs,
-        environment: process.env.NODE_ENV,
-    }).catch((error) => {
-        console.error('Deployment webhook failed:', error.message || error);
-    });
-}
-
 app.get('/api/admin/internal/rate-status', (req, res) => {
     const key = req.get('api-key') || req.query?.['api-key'];
     if (!key) return res.status(401).json({ error: 'API key required' });
-    // find entry
+    const apiKeysJson = getApiKeysCache();
     let found = null;
     for (const entry of Object.values(apiKeysJson || {})) {
         if (entry && entry.key === key) { found = entry; break; }
@@ -267,7 +198,7 @@ app.get('/api/admin/internal/rate-status', (req, res) => {
 app.post('/api/admin/internal/rate-reset', (req, res) => {
     const key = req.get('api-key') || req.body?.['api-key'];
     if (!key) return res.status(401).json({ error: 'API key required' });
-    // find entry
+    const apiKeysJson = getApiKeysCache();
     let found = null;
     for (const entry of Object.values(apiKeysJson || {})) {
         if (entry && entry.key === key) { found = entry; break; }
@@ -278,10 +209,58 @@ app.post('/api/admin/internal/rate-reset', (req, res) => {
     return res.json({ body: `Rate counter for ${identifier} reset.` });
 });
 
-app.use((err, req, res, next) => {
-    res.status(err.status || 500).send({ error: err.message });
-});
+let initialized = false;
+let initPromise = null;
 
-app.use((req, res) => {
-    res.status(404).send({ error: "Sorry, can't find that" });
-});
+async function init() {
+    if (initialized) return app;
+    if (initPromise) return initPromise;
+
+    initPromise = (async () => {
+        console.time('Initialized API');
+        const isTestLikeEnv = ['test', 'github'].includes(env);
+
+        if (process.env.DB_URL) {
+            await connectDB();
+        } else if (!isTestLikeEnv) {
+            throw new Error('DB_URL is not defined in environment variables.');
+        }
+
+        await refreshApiKeysCache();
+        await refreshBannedIpsCache();
+        startApiKeysAutoRefresh();
+        startBannedIpsAutoRefresh();
+
+        const loadRoutesStart = Date.now();
+        console.time('loadRoutes');
+        loadRoutes(app, path.join(__dirname, 'routes'));
+        console.timeEnd('loadRoutes');
+        const loadRoutesDurationMs = Date.now() - loadRoutesStart;
+
+        app.use((err, req, res, next) => {
+            res.status(err.status || 500).send({ error: err.message });
+        });
+        app.use((req, res) => {
+            res.status(404).send({ error: "Sorry, can't find that" });
+        });
+
+        if (env === 'production') {
+            sendDeploymentStatus({
+                loadRoutesTimeMs: loadRoutesDurationMs,
+                environment: env,
+                status: 'success'
+            }).catch((error) => {
+                console.error('Deployment webhook failed:', error.message || error);
+            });
+        }
+
+        initialized = true;
+        console.timeEnd('Initialized API');
+        return app;
+    })();
+
+    return initPromise;
+}
+
+module.exports = app;
+module.exports.init = init;

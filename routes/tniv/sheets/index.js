@@ -1,7 +1,7 @@
 const express = require('express');
 const { loadSettings, resetDB } = require('./sheets.js');
 const path = require('path');
-const { SpreadsheetManager } = require(path.join(global.__basedir,'/utils/spreadsheets'));
+const { SpreadsheetManager } = require(path.join(global.__basedir, '/utils/spreadsheets'));
 const router = express.Router();
 
 /**
@@ -57,10 +57,10 @@ router.post('/reset', async (req, res) => {
     try {
         const { focus } = req.body || {};
         if (!focus) return res.status(400).json({ error: 'Invalid params' });
-        const id = new SpreadsheetManager().getSpreadsheet(focus);
+        const id = await new SpreadsheetManager().getSpreadsheet(focus);
         const settings = await loadSettings(id);
-        console.log(focus)
-        const data = await resetDB(settings, id,focus);
+        console.log(focus);
+        const data = await resetDB(settings, id, focus);
         res.json({ body: data });
     } catch (err) {
         res.status(500).json({ error: err.message });

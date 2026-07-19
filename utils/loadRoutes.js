@@ -1,19 +1,26 @@
 const fs = require('fs');
 const path = require('path');
 const rateLimitPerKey = require('./rateLimit');
-// signature middleware removed: we only use API keys for auth now
 const { validateSession } = require('./adminSessions');
+const { getApiKeysCache } = require('./apiKeys');
 
-function getPermsForPath(apiKeysJson, endpointPath) {
+
+const PUBLIC_DIRS = (process.env.PUBLIC_DIRS || '')
+    .split(',')
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean);
+
+function getAllowedKeysForEndpoint(endpointPath) {
+    const apiKeysJson = getApiKeysCache();
     const perms = {};
     const allKeys = [];
-    for (const [category, entry] of Object.entries(apiKeysJson)) {
-        if (category === 'perms' || category === 'publicDirs') continue;
-        if (!entry.valid) continue;
-        const key = entry.key;
-        const keyPerms = (entry.perm || '').split(',').map(p => p.trim());
 
-        keyPerms.forEach(p => {
+    for (const entry of Object.values(apiKeysJson || {})) {
+        if (!entry || entry.valid === false) continue;
+        const key = entry.key;
+        const keyPerms = (entry.perm || '').split(',').map((p) => p.trim()).filter(Boolean);
+
+        keyPerms.forEach((p) => {
             perms[p] = perms[p] || [];
             perms[p].push(key);
         });
@@ -21,23 +28,22 @@ function getPermsForPath(apiKeysJson, endpointPath) {
         if (keyPerms.includes('all')) {
             allKeys.push(key);
         }
-        // console.log(`API Key for category ${category}: ${key} with perms: ${keyPerms}`);
     }
 
     const endpointKeys = perms[endpointPath] || [];
     return Array.from(new Set([...endpointKeys, ...allKeys]));
 }
 
-function apiKeyMiddleware(allowedKeys) {
-    // Find the apiKeysJson in closure
+function apiKeyMiddleware(endpointPath) {
     return (req, res, next) => {
+        const allowedKeys = getAllowedKeysForEndpoint(endpointPath);
+
         // support session token for admin UI: 'x-admin-session' header
         const sessionToken = req.get('x-admin-session') || req.query?.['admin-session'];
         if (sessionToken) {
             const apiKey = validateSession(sessionToken);
             if (!apiKey) return res.status(401).json({ error: 'Invalid or expired session' });
             if (!allowedKeys.includes(apiKey)) return res.status(403).json({ error: 'Invalid API key for this endpoint' });
-            // attach session info and skip signature requirement later
             req.key = apiKey;
             req.adminSession = sessionToken;
             return next();
@@ -50,37 +56,46 @@ function apiKeyMiddleware(allowedKeys) {
         next();
     };
 }
-function loadRoutes(app, routesDir, apiKeysJson, baseUrl = '/api') {
-    const publicDirs = (apiKeysJson.publicDirs || []).map(dir => dir.toLowerCase());
+
+function loadRoutes(app, routesDir, baseUrl = '/api') {
     const walk = (dir, prefix = '') => {
         const entries = fs.readdirSync(dir);
-        entries.forEach(file => {
+        entries.forEach((file) => {
             const fullPath = path.join(dir, file);
-            
-            const stat = fs.statSync(fullPath);;
+            const stat = fs.statSync(fullPath);
             if (stat.isDirectory()) {
                 walk(fullPath, path.join(prefix, file));
             } else if (file === 'index.js') {
                 const routePath = path.join(prefix).replace(/\\/g, '/');
                 const endpointPath = routePath.replace(/^\/?/, '');
-                const router = require(fullPath);
                 const dirName = path.basename(path.join(prefix));
-                const isPublic = publicDirs.includes(dirName.toLowerCase());
-                if (isPublic) {
-                    app.use(`${baseUrl}/${endpointPath}`, router);
-                    console.log(`Mounted PUBLIC route: ${baseUrl}/${endpointPath}`);
-                } else {
-                    const allowedKeys = getPermsForPath(apiKeysJson, endpointPath);
-                    const middleware = [
-                        apiKeyMiddleware(allowedKeys),
-                        rateLimitPerKey(apiKeysJson),
-                    ];
-                    app.use(`${baseUrl}/${endpointPath}`, middleware, router);
-                    console.log(`Mounted PROTECTED route: ${baseUrl}/${endpointPath}`);
+                const isPublic = PUBLIC_DIRS.includes(dirName.toLowerCase());
+
+                try {
+                    const router = require(fullPath);
+
+                    if (isPublic) {
+                        app.use(`${baseUrl}/${endpointPath}`, router);
+                        console.log(`Mounted PUBLIC route: ${baseUrl}/${endpointPath}`);
+                    } else {
+                        const middleware = [
+                            apiKeyMiddleware(endpointPath),
+                            rateLimitPerKey(),
+                        ];
+
+                        app.use(`${baseUrl}/${endpointPath}`, middleware, router);
+                        console.log(`Mounted PROTECTED route: ${baseUrl}/${endpointPath}`);
+                    }
+                } catch (err) {
+                    console.error(`\n Failed to load route: ${baseUrl}/${endpointPath}`);
+                    console.error(`   File: ${fullPath}`);
+                    console.error(err.stack || err);
+                    console.error('----------------------------------------\n');
                 }
             }
         });
     };
     walk(routesDir);
 }
+
 module.exports = loadRoutes;
