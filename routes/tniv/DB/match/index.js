@@ -177,6 +177,7 @@ router.delete('/', async (req, res) => {
  */
 router.get('/', async (req, res) => {
     try {
+        console.log("match accessed!")
         const sessionId = req.query.sessionId;
         const filter = sessionId ? { sessionId } : {};
         const matches = await Match.find(filter).sort({ createdAt: 1 }).lean();

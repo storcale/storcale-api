@@ -27,7 +27,9 @@ async function connectDB() {
         isConnected = false;
         console.warn('MongoDB disconnected.');
     });
-
+    if(process.env.NODE_ENV === "development"){
+        mongoose.set("debug", true);
+    }
     return mongoose.connection;
 }
 async function disconnectDB() {

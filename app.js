@@ -79,7 +79,18 @@ function getRateLimitsForKey(key) {
     const globalMax = Number(process.env.RATE_LIMIT_MAX) || 60;
     if (!key || key === 'none') return { windowSec: globalWindow, max: globalMax };
 
-    const apiKeysJson = getApiKeysCache();
+    const apiKeysJson = const path = require('path');
+const { mongoose } = require(path.join(global.__basedir, 'db/db.js'));
+// TODO fix schema
+const matchSchema = new mongoose.Schema({
+    sessionId: { type: String, required: true, unique: true, index: true },
+    // Raw match payload exactly as posted by the terminal, kept as-is for backwards compatibility
+    data: { type: mongoose.Schema.Types.Mixed, required: true },
+    matchStartTime: { type: Number, index: true },
+    endTime: { type: Number },
+}, { timestamps: true });
+
+module.exports = mongoose.models.Match || mongoose.model('Match', matchSchema);();
     for (const entry of Object.values(apiKeysJson || {})) {
         if (!entry || typeof entry !== 'object') continue;
         if (entry.key === key) {
@@ -221,20 +232,23 @@ async function init() {
         const isTestLikeEnv = ['test', 'github'].includes(env);
 
         if (process.env.DB_URL) {
+            console.log("Connecting to DB...")
             await connectDB();
-        } else if (!isTestLikeEnv) {
-            throw new Error('DB_URL is not defined in environment variables.');
         }
 
         await refreshApiKeysCache();
         await refreshBannedIpsCache();
-        startApiKeysAutoRefresh();
-        startBannedIpsAutoRefresh();
+        if(!isTestLikeEnv){
+            startApiKeysAutoRefresh();
+            startBannedIpsAutoRefresh();
+        }
+        
 
         const loadRoutesStart = Date.now();
+        console.log("Loading routes...")
         console.time('loadRoutes');
         loadRoutes(app, path.join(__dirname, 'routes'));
-        console.timeEnd('loadRoutes');
+        console.timeEnd('Routes loaded');
         const loadRoutesDurationMs = Date.now() - loadRoutesStart;
 
         app.use((err, req, res, next) => {

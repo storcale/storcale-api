@@ -170,6 +170,7 @@ function buildStats(matches) {
  */
 router.get('/', (req, res) => {
     try {
+        console.log("Stats accessed")
         const matches  = applyFilters(loadMatches(), req.query);
         const stats    = buildStats(matches);
         const response = { stats };
