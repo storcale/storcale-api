@@ -16,7 +16,7 @@ try {
     console.error('Error loading .env:', e);
 }
 
-const { connectDB, mongoose } = require(path.join(basedir, 'utils/db.js'));
+const { connectDB, mongoose } = require(path.join(basedir, 'db/db.js'));
 const ApiKey = require(path.join(basedir, 'db/schemas/apiKey.js'));
 const BannedIp = require(path.join(basedir, 'db/schemas/bannedIp.js'));
 const Spreadsheet = require(path.join(basedir, 'db/schemas/spreadsheet.js'));
