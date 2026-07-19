@@ -17,8 +17,9 @@ async function connectDB() {
     mongoose.set('strictQuery', true);
 
     await mongoose.connect(uri, {
-        dbName: process.env.MONGODB_DB || 'api',
-    });
+    dbName: 'api',
+    serverSelectionTimeoutMS: 10000,
+});
 
     isConnected = true;
     console.timeEnd('DB Connected');
