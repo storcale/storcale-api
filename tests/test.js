@@ -3,7 +3,7 @@ const app = require("../app");
 const fs = require("fs");
 const path = require("path");
 
-const disconnectDb = require(path.join(global.__basedir, "db/db.js")).disconnectDB;
+const disconnectDb = require("../db/db.js").disconnectDB;
 
 const results = [];
 const logFilePath = path.join(__dirname, "../access.log");
@@ -19,12 +19,13 @@ function log(message) {
     }
 }
 
-const agent = request.agent(app)
-    .set("api-key", process.env.ADMIN_KEY);
-
+let agent;
 
 beforeAll(async () => {
     await app.init();
+
+    agent = request.agent(app)
+        .set("api-key", process.env.ADMIN_KEY);
 }, 30000);
 
 
