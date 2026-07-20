@@ -1,0 +1,14 @@
+# @use ./rts/helpers.rts
+
+### Health check
+# @name Health
+# @assert response.statusCode == 200
+GET {{base.url}}/health
+
+### Event stats
+# @name tniv/sheets/events/stats
+GET {{base.url}}/tniv/sheets/events/stats
+{
+Content-Type: application/json
+api-key: {{auth.api-key}}
+}

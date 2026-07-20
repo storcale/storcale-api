@@ -2,9 +2,8 @@
 const { google } = require('googleapis');
 const path = require('path');
 const fs = require('fs');
-const keyFile = path.join(global.__basedir, '/envs/gsaKey.env.json');
 const auth = new google.auth.GoogleAuth({
-    keyFile: keyFile,
+    keyFile: path.join(global.__basedir, 'envs/gsaKey.env.json'),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 

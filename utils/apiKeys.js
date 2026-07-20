@@ -4,12 +4,11 @@ const ApiKey = require(path.join(global.__basedir, 'db/schemas/apiKey.js'));
 let cache = {};
 let refreshTimer = null;
 
-function buildGitHubFallbackConfig() {
+function buildDevFallbackConfig() {
     const adminKey = process.env.ADMIN_KEY;
     if (!adminKey) return null;
-
     return {
-        githubAdmin: {
+        bypassAdmin: {
             key: adminKey,
             valid: true,
             perm: 'all',
@@ -38,10 +37,10 @@ async function fetchApiKeysFromDb() {
  * Loads the API keys config. github uses the ADMIN_KEY env var
  */
 async function loadApiKeysConfig() {
-    const isGithubEnv = String(process.env.NODE_ENV || '').toLowerCase() === 'github';
-
-    if (isGithubEnv) {
-        const fallback = buildGitHubFallbackConfig();
+    const env = String(process.env.NODE_ENV).toLowerCase();
+    const isDevLikeEnv = ['development', 'github'].includes(env);
+    if (isDevLikeEnv) {
+        const fallback = buildDevFallbackConfig();
         if (fallback) return { data: fallback, source: 'env' };
     }
 
@@ -77,5 +76,5 @@ module.exports = {
     refreshApiKeysCache,
     getApiKeysCache,
     startApiKeysAutoRefresh,
-    buildGitHubFallbackConfig,
+    buildDevFallbackConfig,
 };
