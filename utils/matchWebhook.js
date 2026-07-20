@@ -22,7 +22,7 @@ function formatPlayerLines(players) {
     if (!players.length) return '*No players*';
     return players
         .sort((a, b) => b.kills - a.kills)
-        .map(p => `${p.username} ‣ ${p.kills}-${p.deaths} _(${p.ping}ms)_`)
+        .map(p => `${p.username} ‣ ${p.kills}-${p.deaths} `+`_(${p.ping}ms)_`)
         .join('\n');
 }
 
@@ -62,7 +62,7 @@ function buildEmbed(match) {
         title:       gameName,
         url:         gameUrl,
         description: `**${winnerName}** HAVE WON THE GAME!`,
-        color:       winner === 'vanguards' ?  0xff5500: 0xe50000,
+        color:       winner === 'Vanguards' ?  0xff5500: 0xe50000,
         fields: [
             {
                 name:   'Points',
