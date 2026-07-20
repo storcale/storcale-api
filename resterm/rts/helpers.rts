@@ -1,0 +1,6 @@
+module helpers
+
+export fn authHeader(primary, fallback) {
+  let token = primary ?? fallback
+  return token ? token : ""
+}
