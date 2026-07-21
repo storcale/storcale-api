@@ -9,7 +9,7 @@ const { banIp, unbanIp, getBannedIpsCache } = require(path.join(global.__basedir
 const { refreshApiKeysCache } = require(path.join(global.__basedir, '/utils/apiKeys.js'));
 
 function reload() {
-    const scriptPath = path.join(global.__basedir, '/reload.sh');
+    const scriptPath = path.join(global.__basedir, '/scripts/reload.sh');
     return new Promise((resolve, reject) => {
         exec(`"${scriptPath}"`, (error, stdout) => {
             if (error) return reject(error);

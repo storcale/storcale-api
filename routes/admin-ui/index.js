@@ -11,7 +11,7 @@ const ApiKey = require(path.join(global.__basedir, 'db/schemas/apiKey.js'));
 const LOG_PATH = path.join(global.__basedir, 'access.log');
 
 function runReloadScript() {
-    const scriptPath = path.join(global.__basedir, '/reload.sh');
+    const scriptPath = path.join(global.__basedir, '/scripts/reload.sh');
     return new Promise((resolve, reject) => {
         exec(`"${scriptPath}"`, (error, stdout, stderr) => {
             if (error) return reject(error);
