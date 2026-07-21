@@ -1,0 +1,17 @@
+services:
+  api:
+    build: .
+    image: storcale-api:latest
+    container_name: storcale-api
+    restart: unless-stopped
+    ports:
+      - "9902:9902"
+    environment:
+      - NODE_ENV=production
+      - PORT=9902
+    volumes:
+      - ./envs:/app/envs
+      - ./access.log:/app/access.log
+      - ./logs:/app/logs
+      - ./routes/tniv/DB/match/matches.log:/app/routes/tniv/DB/match/matches.log
+      - ./routes/tniv/group/membercount/store.json:/app/routes/tniv/group/membercount/store.json
