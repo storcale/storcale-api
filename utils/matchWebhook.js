@@ -17,12 +17,18 @@ function normalisePlayers(playerList) {
         isVanguard:  p.isVanguard === true,
     }));
 }
-
+function escapeDiscordMarkdown(text) {
+    return String(text).replace(/([\\_*~`>|])/g, '\\$1');
+}
 function formatPlayerLines(players) {
     if (!players.length) return '*No players*';
+
     return players
         .sort((a, b) => b.kills - a.kills)
-        .map(p => `${p.username} ‣ ${p.kills}-${p.deaths} `+`_(${p.ping}ms)_`)
+        .map(p => {
+            const username = escapeDiscordMarkdown(p.username);
+            return `${username} ‣ ${p.kills}-${p.deaths} _(${p.ping}ms)_`;
+        })
         .join('\n');
 }
 
@@ -89,7 +95,9 @@ function buildEmbed(match) {
     if (vanguardMembers.length) {
         embed.fields.push({
             name:   `${defenderName} Group Members`,
-            value:  vanguardMembers.map(p => p.username).join('\n'),
+            value: vanguardMembers
+    .map(p => escapeDiscordMarkdown(p.username))
+    .join('\n'),
             inline: false,
         });
     }
