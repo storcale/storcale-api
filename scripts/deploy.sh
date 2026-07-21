@@ -43,6 +43,7 @@ EOF
 
 trap notify_failure ERR
 
+git stash
 git pull
 
 
@@ -50,6 +51,6 @@ touch access.log
 touch routes/tniv/DB/match/matches.log
 touch routes/tniv/group/membercount/store.json
 
-docker compose build
-docker compose up -d
+timeout 300 docker compose build
+timeout 300 docker compose up -d
 docker image prune -f
