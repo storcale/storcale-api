@@ -1,7 +1,6 @@
 services:
   api:
-    build: .
-    image: ghcr.io/storcale/storcale-api:latest
+    image: ghcr.io/storcale/storcale-api:latest  # Pull pre-built image
     container_name: storcale-api
     restart: unless-stopped
     ports:
