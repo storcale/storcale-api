@@ -32,6 +32,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/$storcale/storcale-api:latest
-          cache-from: type=registry,ref=ghcr.io/$storcale/storcale-api:buildcache
-          cache-to: type=registry,ref=ghcr.io/$storcale/storcale-api:buildcache,mode=max
+          tags: ghcr.io/$storcale-api:latest
+          cache-from: type=registry,ref=ghcr.io/$storcale-api:buildcache
+          cache-to: type=registry,ref=ghcr.io/$storcale-api:buildcache,mode=max
