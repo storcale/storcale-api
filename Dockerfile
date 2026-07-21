@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN timeout 300 bun install -v --production --frozen-lockfile --no-save < /dev/null
+RUN timeout 5m bun install -v --production --frozen-lockfile --no-save < /dev/null
 
 ENV NODE_ENV=production
 ENV PORT=9902
