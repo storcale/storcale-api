@@ -46,11 +46,10 @@ trap notify_failure ERR
 git stash
 git pull
 
-
 touch access.log
 touch routes/tniv/DB/match/matches.log
 touch routes/tniv/group/membercount/store.json
 
-timeout 5m docker compose build
+timeout 5m docker compose pull
 timeout 5m docker compose up -d
 docker image prune -f
