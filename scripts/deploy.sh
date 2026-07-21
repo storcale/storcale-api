@@ -51,6 +51,6 @@ touch access.log
 touch routes/tniv/DB/match/matches.log
 touch routes/tniv/group/membercount/store.json
 
-timeout 300 docker compose build
-timeout 300 docker compose up -d
+timeout 5m docker compose build
+timeout 5m docker compose up -d
 docker image prune -f
