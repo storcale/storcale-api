@@ -9,6 +9,7 @@ app.init()
             console.log(`Express started on port ${port}`);
             console.log(`Environment: ${env}`);
             console.log('Documentation: ' + (env === 'production' ? 'https://storcale-api.omegadev.xyz/api-docs' : 'http://localhost:' + port + '/api-docs'));
+            console.log('Admin dashboard: ' + (env === 'production' ? 'https://storcale-api.omegadev.xyz/admin-ui/dashboard' : 'http://localhost:' + port + '/admin-ui/dashboard'));
         });
     })
     .catch(async (err) => {

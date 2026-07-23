@@ -119,6 +119,17 @@ afterAll(async () => {
 
 describe("General", () => {
 
+    test("Health: API up", async () => {
+        await runTest(
+            "Health: API up",
+            async () => {
+                await request(app)
+                    .get("/api/health")
+                    .expect(200);
+            }
+        );
+    });
+
     test("Api key required", async () => {
         await runTest(
             "Api key required",

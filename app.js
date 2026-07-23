@@ -2,7 +2,6 @@ const express = require('express');
 const app = module.exports = express();
 const fs = require('fs');
 const path = require('path');
-const glob = require('glob');
 const querystring = require('node:querystring');
 const env = String(process.env.NODE_ENV || 'development').toLowerCase();
 app.use(express.json());
@@ -31,38 +30,13 @@ const {
 const loadRoutes = require('./utils/loadRoutes');
 const { sendDeploymentStatus } = require('./utils/sendDeploymentStatus');
 const { notifyRateLimitExceeded } = require('./utils/notify');
+const { getOpenApiSpec } = require('./utils/openapiSpec');
 
 const rateStore = new Map(); // ip/key -> array of epoch seconds
 
 // Swagger setup
 const swaggerUi = require('swagger-ui-express');
-const swaggerJSDoc = require('swagger-jsdoc');
-
-const swaggerDefinition = {
-    openapi: '3.0.0',
-    info: {
-        title: 'Storcale API',
-        version: '1.0.0',
-        description: 'API documentation for Storcale',
-    },
-    servers: [
-        { url: 'https://storcale-api.omegadev.xyz/api' },
-    ],
-    components: {
-        securitySchemes: {
-            ApiKeyAuth: {
-                type: 'apiKey',
-                in: 'header',
-                name: 'api-key'
-            }
-        }
-    },
-    security: [
-        { ApiKeyAuth: [] }
-    ]
-};
-const apiFiles = glob.sync('routes/**/*.js');
-const swaggerSpec = swaggerJSDoc({ swaggerDefinition, apis: apiFiles });
+const swaggerSpec = getOpenApiSpec();
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Admin UI routes

@@ -6,6 +6,8 @@ const { exec } = require('child_process');
 const { createSessionCookie, verifySessionCookie, clearCookieHeader } = require(path.join(global.__basedir, '/utils/adminAuth.js'));
 const { getBannedIpsCache, banIp, unbanIp } = require(path.join(global.__basedir, '/utils/bannedIps.js'));
 const { refreshApiKeysCache } = require(path.join(global.__basedir, '/utils/apiKeys.js'));
+const { createSession } = require(path.join(global.__basedir, '/utils/adminSessions.js'));
+const { getOpenApiSpec } = require(path.join(global.__basedir, '/utils/openapiSpec.js'));
 const ApiKey = require(path.join(global.__basedir, 'db/schemas/apiKey.js'));
 
 const LOG_PATH = path.join(global.__basedir, 'access.log');
@@ -19,6 +21,9 @@ function runReloadScript() {
         });
     });
 }
+
+// static assets for the dashboard (css/js) — no auth needed, no secrets live here
+router.use('/admin-ui/static', express.static(path.join(__dirname, 'static')));
 
 // public UI pages
 router.get('/admin-ui/login', (req, res) => {
@@ -60,6 +65,11 @@ function requireAuth(req, res, next) {
     req.adminUser = user;
     next();
 }
+
+// API: who am i (used by the dashboard on load to confirm the session is still valid)
+router.get('/api/admin-ui/me', requireAuth, (req, res) => {
+    return res.json({ user: req.adminUser });
+});
 
 // API: logs (simple tail)
 router.get('/api/admin-ui/logs', requireAuth, (req, res) => {
@@ -131,7 +141,7 @@ router.get('/api/admin-ui/keys', requireAuth, async (req, res) => {
             if (s.length <= 8) return s.replace(/./g, '*');
             return `${s.slice(0, 4)}...${s.slice(-4)}`;
         }
-        const out = docs.map(d => ({ name: d.name, id: d.name, masked: maskKey(d.key), valid: d.valid !== false, meta: d.meta || {} }));
+        const out = docs.map(d => ({ name: d.name, id: d.name, masked: maskKey(d.key), valid: d.valid !== false, perm: d.perm || '', meta: d.meta || {} }));
         return res.json({ keys: out });
     } catch (e) { return res.status(500).json({ error: e.message }); }
 });
@@ -145,6 +155,27 @@ router.put('/api/admin-ui/keys/deactivate', requireAuth, express.json(), async (
         await refreshApiKeysCache();
         return res.json({ ok: true });
     } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
+// API: OpenAPI spec, used to auto-build the Routes explorer tab.
+// Built once from the same @swagger JSDoc comments that already power /api-docs.
+router.get('/api/admin-ui/openapi', requireAuth, (req, res) => {
+    try {
+        const spec = getOpenApiSpec(req.query.refresh === 'true');
+        return res.json(spec);
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
+// API: mint a short-lived x-admin-session token bound to ADMIN_KEY.
+// The Routes explorer uses this as the "x-admin-session" header so it can
+// call protected /api/* endpoints directly from the browser (see
+// utils/loadRoutes.js apiKeyMiddleware) without ever exposing ADMIN_KEY itself.
+router.post('/api/admin-ui/routes-session', requireAuth, express.json(), (req, res) => {
+    const adminKey = process.env.ADMIN_KEY;
+    if (!adminKey) return res.status(500).json({ error: 'ADMIN_KEY is not configured on the server' });
+    const ttl = Math.min(Number(req.body?.ttl) || 900, 3600);
+    const { token, expires } = createSession(adminKey, ttl);
+    return res.json({ token, expires });
 });
 
 module.exports = router;
