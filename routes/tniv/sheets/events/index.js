@@ -100,6 +100,11 @@
  *           type: string
  *         description: Filter by event type
  *       - in: query
+ *         name: username
+ *         schema:
+ *           type: string
+ *         description: Get stats from a specific user
+ *       - in: query
  *         name: from
  *         schema:
  *           type: string

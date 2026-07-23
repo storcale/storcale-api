@@ -1,23 +1,62 @@
 <!doctype html>
-<html>
-<head><meta charset="utf-8"><title>Admin Login</title>
-<link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css"></head>
-<body class="w3-light-grey">
-<div class="w3-container w3-card-4 w3-white" style="max-width:400px;margin:40px auto;padding:20px;">
-<h3>Admin Login</h3>
-<input id="user" class="w3-input w3-margin" placeholder="username"/>
-<input id="pass" type="password" class="w3-input w3-margin" placeholder="password"/>
-<button id="login" class="w3-button w3-teal">Login</button>
-<div id="note"></div>
-</div>
-<script>
-document.getElementById('login').addEventListener('click', async ()=>{
-  const user = document.getElementById('user').value;
-  const pass = document.getElementById('pass').value;
-  const res = await fetch('/api/admin-ui/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})});
-  const j = await res.json();
-  if (res.ok) { window.location.href = '/admin-ui/dashboard'; } else { document.getElementById('note').innerText = j.error || 'Login failed'; }
-});
-</script>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Storcale Admin — Login</title>
+  <link rel="stylesheet" href="/admin-ui/static/app.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <h1>Storcale Admin</h1>
+      <p class="sub">Sign in to manage the API.</p>
+
+      <div class="field">
+        <label for="user">Username</label>
+        <input id="user" type="text" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label for="pass">Password</label>
+        <input id="pass" type="password" autocomplete="current-password" />
+      </div>
+      <button id="login" class="btn btn-accent">Log in</button>
+      <div id="note" class="login-error"></div>
+    </div>
+  </div>
+
+  <script>
+    const userEl = document.getElementById('user');
+    const passEl = document.getElementById('pass');
+    const noteEl = document.getElementById('note');
+    const btnEl = document.getElementById('login');
+
+    async function doLogin() {
+      noteEl.textContent = '';
+      btnEl.disabled = true;
+      btnEl.textContent = 'Signing in…';
+      try {
+        const res = await fetch('/api/admin-ui/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: userEl.value, password: passEl.value })
+        });
+        const j = await res.json();
+        if (res.ok) {
+          window.location.href = '/admin-ui/dashboard';
+        } else {
+          noteEl.textContent = j.error || 'Login failed';
+        }
+      } catch (e) {
+        noteEl.textContent = 'Request failed: ' + e.message;
+      } finally {
+        btnEl.disabled = false;
+        btnEl.textContent = 'Log in';
+      }
+    }
+
+    btnEl.addEventListener('click', doLogin);
+    passEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+  </script>
 </body>
 </html>

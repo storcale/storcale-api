@@ -38,7 +38,7 @@ async function fetchApiKeysFromDb() {
  */
 async function loadApiKeysConfig() {
     const env = String(process.env.NODE_ENV).toLowerCase();
-    const isDevLikeEnv = ['development', 'github'].includes(env);
+    const isDevLikeEnv = ['development', 'github','test'].includes(env);
     if (isDevLikeEnv) {
         const fallback = buildDevFallbackConfig();
         if (fallback) return { data: fallback, source: 'env' };
