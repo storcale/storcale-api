@@ -160,9 +160,6 @@
  *                       type: integer
  *                     LoseCount:
  *                       type: integer
- *                     WinRate:
- *                      type: number
- *                      format: float
  *                     MostAgainst:
  *                       type: string
  *                     TopAgainst:
@@ -242,7 +239,7 @@ router.get('/stats', async (req, res) => {
             if (parts.length >= 3) {
                 const [month, day, year] = parts;
                 if (parts.length >= 6) {
-                    const { type, eventType, from, to, username } = req.query;
+                    const [year,month ,day , hour, min, sec] = parts;
                     return new Date(year, month - 1, day, hour || 0, min || 0, sec || 0);
                 }
                 return new Date(year, month - 1, day);
@@ -269,145 +266,94 @@ router.get('/stats', async (req, res) => {
             events = filterByDate(events);
         }
 
-        if (username) {
-            const hostedEvents = events.filter(ev => ev.username && ev.username.toLowerCase() === username.toLowerCase());
-            const attendedEvents = events.filter(ev => {
-                if (!ev.attendance) return false;
-                return ev.attendance.split(/[,;]/).map(a => a.trim().toLowerCase()).includes(username.toLowerCase());
-            });
-            const eventTypeCounts = {};
-            hostedEvents.forEach(ev => {
-                if (ev.event_type) {
-                    eventTypeCounts[ev.event_type] = (eventTypeCounts[ev.event_type] || 0) + 1;
-                }
-            });
-            let MostHostedEventType = null;
-            if (Object.keys(eventTypeCounts).length > 0) {
-                MostHostedEventType = Object.entries(eventTypeCounts).sort((a, b) => b[1] - a[1])[0][0];
-            }
-            return res.json({
-                stats: {
-                    hostedCount: hostedEvents.length,
-                    attendedCount: attendedEvents.length,
-                    MostHostedEventType,
-                }
-            });
-        }
+        function computeGeneralStats(eventsList, raidEventsList = eventsList) {
+            const EventCount = eventsList.length;
 
-        // Otherwise, return general stats
-        const EventCount = events.length;
-        const hostCounts = {};
-        events.forEach(ev => {
-            if (ev.username) {
-                hostCounts[ev.username] = (hostCounts[ev.username] || 0) + 1;
-            }
-        });
-        let attendanceCount = 0
-        let bestAttendance = 0
-        events.forEach(ev => {
-            if (ev.attendance) {
-                let at = ev.attendance.split(',').length
-                if (at > bestAttendance) bestAttendance = at
-                attendanceCount += at
-            }
-        });
-        const averageAttendance = Math.round((attendanceCount / EventCount) * 100) / 100
-        const TopHosts = Object.entries(hostCounts)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([username, count]) => ({ username, count }));
-        const attendeeCounts = {};
-        events.forEach(ev => {
-            if (ev.attendance) {
-                ev.attendance.split(/[,;]/).map(a => a.trim()).filter(Boolean).forEach(att => {
-                    attendeeCounts[att] = (attendeeCounts[att] || 0) + 1;
+            const hostCounts = {};
+            eventsList.forEach(ev => {
+                if (ev.username) hostCounts[ev.username] = (hostCounts[ev.username] || 0) + 1;
+            });
+
+            let attendanceCount = 0;
+            let bestAttendance = 0;
+            eventsList.forEach(ev => {
+                if (ev.attendance) {
+                    const at = ev.attendance.split(',').length;
+                    if (at > bestAttendance) bestAttendance = at;
+                    attendanceCount += at;
+                }
+            });
+            const averageAttendance = EventCount ? Math.round((attendanceCount / EventCount) * 100) / 100 : 0;
+
+            const TopHosts = Object.entries(hostCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([username, count]) => ({ username, count }));
+
+            const attendeeCounts = {};
+            eventsList.forEach(ev => {
+                if (ev.attendance) {
+                    ev.attendance.split(/[,;]/).map(a => a.trim()).filter(Boolean).forEach(att => {
+                        attendeeCounts[att] = (attendeeCounts[att] || 0) + 1;
+                    });
+                }
+            });
+            const TopAttendees = Object.entries(attendeeCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([attendee, count]) => ({ attendee, count }));
+
+            let TopMap = null, WinCount = null, LoseCount = null, WinRate = null;
+            let topAgainstSingle = null, TopAgainst = null;
+
+            const raidDefenseEvents = raidEventsList.filter(ev =>
+                ev.event_type && ev.event_type.toLowerCase().includes('raid/defense')
+            );
+
+            if (raidDefenseEvents.length > 0) {
+                const mapCounts = {};
+                let winCount = 0, loseCount = 0;
+
+                raidDefenseEvents.forEach(ev => {
+                    if (ev.map) mapCounts[ev.map] = (mapCounts[ev.map] || 0) + 1;
+                    if (ev.did_win === 'TRUE') winCount++;
+                    if (ev.did_win === 'FALSE') loseCount++;
                 });
-            }
-        });
-        const TopAttendees = Object.entries(attendeeCounts)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([attendee, count]) => ({ attendee, count }));
 
-        let TopMap = null, WinCount = null, LoseCount = null, WinRate = null;
+                TopMap = Object.entries(mapCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+                WinCount = winCount;
+                LoseCount = loseCount;
+                WinRate = (winCount + loseCount) > 0
+                    ? Math.round((winCount / (winCount + loseCount)) * 10000) / 100
+                    : 0;
 
-const raidDefenseEvents = events.filter(ev =>
-    ev.event_type &&
-    ev.event_type.toLowerCase().includes('raid/defense')
-);
+                if (req.query.against !== undefined) {
+                    const topN = (() => {
+                        const v = req.query.against;
+                        const n = Number(v);
+                        if (v === '' || v === 'true' || isNaN(n)) return 1;
+                        return n > 0 ? Math.floor(n) : 1;
+                    })();
 
-if (raidDefenseEvents.length > 0) {
-    const mapCounts = {};
-    let winCount = 0;
-    let loseCount = 0;
+                    const againstCounts = {};
+                    raidDefenseEvents.forEach(ev => {
+                        if (!ev.against) return;
+                        ev.against.split(/[,;]/).map(a => a.trim()).filter(Boolean).forEach(a => {
+                            againstCounts[a] = (againstCounts[a] || 0) + 1;
+                        });
+                    });
 
-    raidDefenseEvents.forEach(ev => {
-        if (ev.map) {
-            mapCounts[ev.map] = (mapCounts[ev.map] || 0) + 1;
-        }
-        if (ev.did_win === 'TRUE') {
-            winCount++;
-        }
-        if (ev.did_win === 'FALSE') {
-            loseCount++;
-        }
-    });
+                    const topAgainstArr = Object.entries(againstCounts)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, topN)
+                        .map(([against, count]) => ({ against, count }));
 
-    TopMap = Object.entries(mapCounts)
-        .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-
-    WinCount = winCount;
-    LoseCount = loseCount;
-    WinRate =
-        (winCount + loseCount) > 0
-            ? Math.round((winCount / (winCount + loseCount)) * 10000) / 100
-            : 0;
-
-    if (req.query.against !== undefined) {
-        const topN = (() => {
-            const v = req.query.against;
-            const n = Number(v);
-            if (v === '' || v === 'true' || isNaN(n)) return 1;
-            return n > 0 ? Math.floor(n) : 1;
-        })();
-
-        const againstCounts = {};
-
-        raidDefenseEvents.forEach(ev => {
-            if (!ev.against) return;
-            ev.against
-                .split(/[,;]/)
-                .map(a => a.trim())
-                .filter(Boolean)
-                .forEach(a => {
-                    againstCounts[a] = (againstCounts[a] || 0) + 1;
-                });
-        });
-
-        const topAgainst = Object.entries(againstCounts)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, topN)
-            .map(([against, count]) => ({ against, count }));
-
-        if (topN === 1) {
-            return res.json({
-                stats: {
-                    EventCount,
-                    bestAttendance,
-                    averageAttendance,
-                    TopHosts,
-                    TopAttendees,
-                    ...(TopMap ? { TopMap } : {}),
-                    ...(WinCount !== null ? { WinCount } : {}),
-                    ...(LoseCount !== null ? { LoseCount } : {}),
-                    ...(WinRate !== null ? { WinRate } : {}),
-                    topAgainst: topAgainst[0]?.against || null
+                    if (topN === 1) topAgainstSingle = topAgainstArr[0]?.against || null;
+                    else TopAgainst = topAgainstArr;
                 }
-            });
-        }
+            }
 
-        return res.json({
-            stats: {
+            return {
                 EventCount,
                 bestAttendance,
                 averageAttendance,
@@ -417,25 +363,43 @@ if (raidDefenseEvents.length > 0) {
                 ...(WinCount !== null ? { WinCount } : {}),
                 ...(LoseCount !== null ? { LoseCount } : {}),
                 ...(WinRate !== null ? { WinRate } : {}),
-                TopAgainst: topAgainst
-            }
-        });
-    }
-}
+                ...(topAgainstSingle !== null ? { topAgainst: topAgainstSingle } : {}),
+                ...(TopAgainst !== null ? { TopAgainst } : {}),
+            };
+        }
 
-return res.json({
-    stats: {
-        EventCount,
-        bestAttendance,
-        averageAttendance,
-        TopHosts,
-        TopAttendees,
-        ...(TopMap ? { TopMap } : {}),
-        ...(WinCount !== null ? { WinCount } : {}),
-        ...(LoseCount !== null ? { LoseCount } : {}),
-        ...(WinRate !== null ? { WinRate } : {})
-    }
-});
+        if (username) {
+            const lowerUsername = username.toLowerCase();
+
+            const hostedEvents = events.filter(ev => ev.username && ev.username.toLowerCase() === lowerUsername);
+            const attendedEvents = events.filter(ev => {
+                if (!ev.attendance) return false;
+                return ev.attendance.split(/[,;]/).map(a => a.trim().toLowerCase()).includes(lowerUsername);
+            });
+
+            // Union of hosted + attended for general/attendance stats.
+            const involvedEvents = Array.from(new Set([...hostedEvents, ...attendedEvents]));
+
+            const eventTypeCounts = {};
+            hostedEvents.forEach(ev => {
+                if (ev.event_type) eventTypeCounts[ev.event_type] = (eventTypeCounts[ev.event_type] || 0) + 1;
+            });
+            let MostHostedEventType = null;
+            if (Object.keys(eventTypeCounts).length > 0) {
+                MostHostedEventType = Object.entries(eventTypeCounts).sort((a, b) => b[1] - a[1])[0][0];
+            }
+
+            return res.json({
+                stats: {
+                    hostedCount: hostedEvents.length,
+                    attendedCount: attendedEvents.length,
+                    MostHostedEventType,
+                    ...computeGeneralStats(involvedEvents, hostedEvents),
+                }
+            });
+        }
+
+        return res.json({ stats: computeGeneralStats(events) });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -481,7 +445,6 @@ router.get('/', async (req, res) => {
                 const [month, day, year] = parts;
                 if (parts.length >= 6) {
                     // time
-                    
                     const [month, day, year, hour, min, sec] = parts;
                     return new Date(year, month - 1, day, hour || 0, min || 0, sec || 0);
                 }
