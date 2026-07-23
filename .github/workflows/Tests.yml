@@ -65,6 +65,7 @@ jobs:
           VG_MAINFRAME: ${{ secrets.VG_MAINFRAME }}
           DB_URL: ${{ secrets.DB_URL }}
           NODE_OPTIONS: --experimental-vm-modules
+          PUBLIC_DIRS: "admin-ui/login,login,api-docs,health"
         run: |
           set +e
           set -o pipefail
