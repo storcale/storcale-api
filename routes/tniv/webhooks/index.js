@@ -6,7 +6,7 @@ const querystring = require('node:querystring');
 const { error } = require('node:console');
 let lastWebhookContent = null;
 const { notifyDeniedWebhook } = require(path.join(global.__basedir, "utils/notify.js"))
-
+const { getWebhookByCode } = require(path.join(global.__basedir, 'utils/webhooks.js'))
 /**
  * @swagger
  * /tniv/webhooks:
@@ -200,7 +200,7 @@ router.post('/', async (req, res) => {
     }
 
     const isDuplicate = lastWebhookContent === JSON.stringify(body);
-    
+
     if (hasPing || !hasKeyword || isDuplicate) {
         if (isDuplicate) {
             notifyDeniedWebhook(hasPing, hasKeyword, isDuplicate, info)
@@ -208,13 +208,15 @@ router.post('/', async (req, res) => {
         lastWebhookContent = JSON.stringify(body);
         return res.status(403).json({ error: `Webhook denied. ${hasPing} ${hasKeyword}  ${isDuplicate}` });
     }
-        
+
 
     try {
-        const target = process.env[query.target]
-        if(!target){
-            throw new Error("This webhook doesnt exist.")
+        const webhookEntry = getWebhookByCode(query.target);
+        if (!webhookEntry) {
+            throw new Error("This webhook doesnt exist.");
         }
+        const target = webhookEntry.url;
+
         let payload = cleanPayload(body);
         if (!whitelisted) { payload.flags = 4096; }
         if (!payload.content && !payload.embeds) {
@@ -224,7 +226,7 @@ router.post('/', async (req, res) => {
         lastWebhookContent = JSON.stringify(body);
         return res.status(200).json({ body: 'Webhook forwarded.' });
     } catch (err) {
-        return res.status(500).json({ error: 'Failed to forward webhook.', details: err?.response?.data || err?.message || err, TARGET_WEBHOOK_URL:query.target });
+        return res.status(500).json({ error: 'Failed to forward webhook.', details: err?.response?.data || err?.message || err, TARGET_WEBHOOK_URL: query.target });
     }
 }
 );

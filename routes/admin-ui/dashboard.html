@@ -1,18 +1,21 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Storcale Admin</title>
   <link rel="stylesheet" href="/admin-ui/static/app.css">
 </head>
+
 <body>
   <div class="app">
     <header class="topbar">
       <div class="brand"><span class="pulse" id="pulseDot"></span>Storcale <span>Admin</span></div>
       <div class="topbar-meta">
         <span id="userLabel" class="hide-mobile"></span>
-        <a href="/api-docs" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="text-decoration:none">Docs ↗</a>
+        <a href="/api-docs" target="_blank" rel="noopener" class="btn btn-ghost btn-sm"
+          style="text-decoration:none">Docs ↗</a>
         <button id="logoutBtn" class="btn btn-ghost btn-sm">Logout</button>
       </div>
     </header>
@@ -23,6 +26,7 @@
       <button class="nav-item" data-tab="bans"><span class="icon">⛔</span><span>Bans</span></button>
       <button class="nav-item" data-tab="keys"><span class="icon">⚿</span><span>Keys</span></button>
       <button class="nav-item" data-tab="routes"><span class="icon">⌘</span><span>Routes</span></button>
+      <button class="nav-item" data-tab="webhooks"><span class="icon">⚓</span><span>Webhooks</span></button>
       <div class="nav-footer">
         <button id="reloadServerBtn" class="btn btn-sm" style="width:100%">Reload server</button>
       </div>
@@ -70,7 +74,10 @@
         <div class="panel">
           <h2>Traffic Stats</h2>
           <div class="stat-grid" id="statsGrid">
-            <div class="stat-card"><div class="value">–</div><div class="label">Loading…</div></div>
+            <div class="stat-card">
+              <div class="value">–</div>
+              <div class="label">Loading…</div>
+            </div>
           </div>
         </div>
       </section>
@@ -107,7 +114,8 @@
         <div class="panel">
           <h2>Routes Explorer</h2>
           <p style="color:var(--muted); font-size:12px; margin-top:-8px">
-            Auto-generated from the API's OpenAPI spec. Requests are sent using a short-lived admin session token — your real API key is never exposed to the browser.
+            Auto-generated from the API's OpenAPI spec. Requests are sent using a short-lived admin session token — your
+            real API key is never exposed to the browser.
           </p>
           <div class="routes-layout" style="margin-top:10px">
             <div>
@@ -120,10 +128,34 @@
           </div>
         </div>
       </section>
-
+      <!-- WEBHOOKS -->
+      <section id="tab-webhooks" class="tab">
+        <div class="panel">
+          <h2>Webhook Sends</h2>
+          <div class="row">
+            <div class="field" style="min-width:200px">
+              <label for="webhookCodeFilter">Webhook</label>
+              <select id="webhookCodeFilter">
+                <option value="">All</option>
+              </select>
+            </div>
+            <div class="field" style="flex:1; min-width:200px">
+              <label for="webhookKeyword">Keyword</label>
+              <input id="webhookKeyword" type="text" placeholder="search content, embeds, fields..." />
+            </div>
+            <div class="field">
+              <label for="webhookCount">Limit</label>
+              <input id="webhookCount" type="number" value="100" style="width:90px" />
+            </div>
+            <button id="refreshWebhooksBtn" class="btn btn-sm" style="align-self:flex-end">Refresh</button>
+          </div>
+          <div class="webhook-feed" id="webhooksArea" style="margin-top:14px">Loading…</div>
+        </div>
+      </section>
     </main>
   </div>
 
   <script src="/admin-ui/static/app.js"></script>
 </body>
+
 </html>
