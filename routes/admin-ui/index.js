@@ -9,7 +9,8 @@ const { refreshApiKeysCache } = require(path.join(global.__basedir, '/utils/apiK
 const { createSession } = require(path.join(global.__basedir, '/utils/adminSessions.js'));
 const { getOpenApiSpec } = require(path.join(global.__basedir, '/utils/openapiSpec.js'));
 const ApiKey = require(path.join(global.__basedir, 'db/schemas/apiKey.js'));
-
+const { getWebhookByCode, getWebhooksCache, addWebhook, removeWebhook } = require(path.join(global.__basedir, '/utils/webhooks.js'));
+const Webhook = require(path.join(global.__basedir, 'db/schemas/webhook.js'));
 const LOG_PATH = path.join(global.__basedir, 'access.log');
 
 function runReloadScript() {
@@ -155,6 +156,95 @@ router.put('/api/admin-ui/keys/deactivate', requireAuth, express.json(), async (
         await refreshApiKeysCache();
         return res.json({ ok: true });
     } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+function parseAccessLogLine(line) {
+    const tsMatch = line.match(/^\[(.*?)\]/);
+    if (!tsMatch) return null;
+
+    const methodUrlMatch = line.match(/\]\s+(\S+)\s+(\S+)\s+-/);
+    if (!methodUrlMatch) return null;
+
+    const bodyMarker = '- body: ';
+    const queryMarker = ' - query: ';
+    const responseMarker = ' - response: ';
+
+    const bodyIdx = line.indexOf(bodyMarker);
+    const queryIdx = line.indexOf(queryMarker);
+    const responseIdx = line.indexOf(responseMarker);
+
+    let bodyStr = null;
+    if (bodyIdx !== -1 && queryIdx !== -1 && queryIdx > bodyIdx) {
+        bodyStr = line.slice(bodyIdx + bodyMarker.length, queryIdx);
+    }
+
+    let queryStr = null;
+    if (queryIdx !== -1 && responseIdx !== -1) {
+        queryStr = line.slice(queryIdx + queryMarker.length, responseIdx);
+    }
+
+    const responseMatch = line.match(/response:\s*(\d+)/);
+
+    return {
+        timestamp: tsMatch[1],
+        method: methodUrlMatch[1],
+        url: methodUrlMatch[2],
+        bodyStr,
+        queryStr,
+        status: responseMatch ? Number(responseMatch[1]) : null,
+    };
+}
+// API: list configured webhooks (name/code only — never expose the url to the browser)
+router.get('/api/admin-ui/webhooks', requireAuth, async (req, res) => {
+    try {
+        const docs = await Webhook.find({}).select('name code').lean();
+        return res.json({ webhooks: docs });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
+// API: webhook send history — parsed straight out of access.log, no extra storage
+router.get('/api/admin-ui/webhooks/logs', requireAuth, (req, res) => {
+    try {
+        const { code, keyword } = req.query;
+        const n = Math.max(1, Math.min(500, Number(req.query.n) || 100));
+
+        const raw = fs.existsSync(LOG_PATH) ? fs.readFileSync(LOG_PATH, 'utf8') : '';
+        const lines = raw.split(/\r?\n/).filter(Boolean);
+        const webhooksCache = getWebhooksCache();
+        const results = [];
+
+        for (let i = lines.length - 1; i >= 0 && results.length < n; i--) {
+            const parsed = parseAccessLogLine(lines[i]);
+            if (!parsed) continue;
+            if (parsed.method !== 'POST') continue;
+            if (!parsed.url.includes('/tniv/webhooks')) continue;
+            if (parsed.status !== 200) continue;
+            if (!parsed.bodyStr) continue;
+
+            let payload;
+            try { payload = JSON.parse(parsed.bodyStr); } catch { continue; }
+
+            let webhookCode = null;
+            if (parsed.queryStr) {
+                const m = parsed.queryStr.match(/target=([^&]+)/);
+                if (m) webhookCode = decodeURIComponent(m[1]);
+            }
+            if (code && webhookCode !== code) continue;
+
+            const entryName = webhooksCache[webhookCode]?.name || webhookCode || 'unknown';
+
+            if (keyword) {
+                const kw = String(keyword).toLowerCase();
+                const haystack = `${JSON.stringify(payload)} ${entryName} ${webhookCode || ''}`.toLowerCase();
+                if (!haystack.includes(kw)) continue;
+            }
+
+            results.push({ timestamp: parsed.timestamp, code: webhookCode, name: entryName, payload });
+        }
+
+        return res.json({ logs: results });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
 });
 
 // API: OpenAPI spec, used to auto-build the Routes explorer tab.

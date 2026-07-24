@@ -30,13 +30,14 @@
     }
   });
 
-  const tabs = ['logs', 'stats', 'bans', 'keys', 'routes'];
+  const tabs = ['logs', 'stats', 'bans', 'keys', 'routes','webhooks'];
   const loaders = {
     logs: loadLogs,
     stats: loadStats,
     bans: loadBans,
     keys: loadKeys,
     routes: loadRoutes,
+    webhooks: loadWebhooksTab,
   };
 
   document.querySelectorAll('.nav-item[data-tab]').forEach((btn) => {
@@ -476,6 +477,107 @@
       sendBtn.disabled = false;
     }
   }
+  // ---------------------------------------------------------------
+// WEBHOOKS
+// ---------------------------------------------------------------
+async function loadWebhookLogs() {
+    const area = document.getElementById('webhooksArea');
+    area.innerHTML = '<div class="empty">Loading…</div>';
+
+    const code = document.getElementById('webhookCodeFilter').value;
+    const keyword = document.getElementById('webhookKeyword').value.trim();
+    const n = Number(document.getElementById('webhookCount').value) || 100;
+
+    const params = new URLSearchParams();
+    if (code) params.set('code', code);
+    if (keyword) params.set('keyword', keyword);
+    params.set('n', n);
+
+    try {
+        const res = await fetch(`/api/admin-ui/webhooks/logs?${params.toString()}`, { credentials: 'same-origin' });
+        const j = await res.json();
+        if (!res.ok) { area.innerHTML = `<div class="empty">${j.error || 'Failed to load'}</div>`; return; }
+        const logs = j.logs || [];
+        if (!logs.length) { area.innerHTML = '<div class="empty">No webhook sends match your filters.</div>'; return; }
+        area.innerHTML = logs.map(renderWebhookEntry).join('');
+    } catch (e) {
+        area.innerHTML = `<div class="empty">${e.message}</div>`;
+    }
+}
+
+async function loadWebhooksTab() {
+    if (!webhookPickersLoaded) {
+        await loadWebhookPickers();
+        webhookPickersLoaded = true;
+    }
+    await loadWebhookLogs();
+}
+
+document.getElementById('refreshWebhooksBtn').addEventListener('click', loadWebhookLogs);
+document.getElementById('webhookCodeFilter').addEventListener('change', loadWebhookLogs);
+document.getElementById('webhookKeyword').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loadWebhookLogs();
+});
+let webhookPickersLoaded = false;
+
+function escHtml(str) {
+    return String(str ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+function decimalToHex(num) {
+    if (typeof num !== 'number') return '#5865F2';
+    return '#' + (num >>> 0).toString(16).padStart(6, '0').slice(-6);
+}
+
+function renderWebhookEntry(entry) {
+    const payload = entry.payload || {};
+    const embeds = Array.isArray(payload.embeds) && payload.embeds.length ? payload.embeds : [null];
+    const when = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '';
+    const content = payload.content ? `<div class="embed-content">${escHtml(payload.content)}</div>` : '';
+
+    const embedsHtml = embeds.map((embed) => {
+        if (!embed) return '';
+        const color = decimalToHex(embed.color);
+        const title = embed.title ? `<div class="embed-title">${escHtml(embed.title)}</div>` : '';
+        const desc = embed.description ? `<div class="embed-desc">${escHtml(embed.description)}</div>` : '';
+        const fields = Array.isArray(embed.fields) && embed.fields.length
+            ? `<div class="embed-fields">${embed.fields.map((f) => `
+                <div class="embed-field${f.inline ? ' inline' : ''}">
+                  <div class="embed-field-name">${escHtml(f.name)}</div>
+                  <div class="embed-field-value">${escHtml(f.value)}</div>
+                </div>`).join('')}</div>`
+            : '';
+        const footer = embed.footer?.text ? `<div class="embed-footer">${escHtml(embed.footer.text)}</div>` : '';
+        return `
+          <div class="discord-embed" style="--embed-color:${color}">
+            <div class="embed-bar"></div>
+            <div class="embed-body">${title}${desc}${fields}${footer}</div>
+          </div>`;
+    }).join('');
+
+    return `
+      <div class="webhook-card">
+        <div class="webhook-card-meta">
+          <span class="badge">${escHtml(entry.name || entry.code || 'unknown')}</span>
+          <span class="mono" style="font-size:11px;color:var(--muted)">${escHtml(entry.code || '')} · ${escHtml(when)}</span>
+        </div>
+        ${content}
+        ${embedsHtml}
+      </div>`;
+}
+
+async function loadWebhookPickers() {
+    const sel = document.getElementById('webhookCodeFilter');
+    try {
+        const res = await fetch('/api/admin-ui/webhooks', { credentials: 'same-origin' });
+        const j = await res.json();
+        const webhooks = j.webhooks || [];
+        sel.innerHTML = '<option value="">All</option>' +
+            webhooks.map((w) => `<option value="${escHtml(w.code)}">${escHtml(w.name)} (${escHtml(w.code)})</option>`).join('');
+    } catch (e) { /* keep default "All" option */ }
+}
+
+
 
   // ---------------------------------------------------------------
   // boot

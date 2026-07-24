@@ -24,6 +24,7 @@ const Match = require(path.join(basedir, 'db/schemas/match.js'));
 const PlayerStat = require(path.join(basedir, 'db/schemas/playerStat.js'));
 const MemberCount = require(path.join(basedir, 'db/schemas/memberCount.js'));
 const { extractPlayerDeltas } = require(path.join(basedir, 'utils/matchStats.js'));
+const Webhook = require(path.join(basedir, 'db/schemas/webhook.js'));
 
 async function migrateApiKeys() {
     const file = path.join(basedir, 'envs', 'apikeys.env.json');
@@ -48,6 +49,44 @@ async function migrateApiKeys() {
         count++;
     }
     console.log(`[apiKeys] Migrated ${count} key(s).`);
+}
+
+async function migrateWebhooks() {
+    const file = path.join(basedir, 'envs', 'webhook.env');
+    if (!fs.existsSync(file)) return console.log('[webhooks] No webhook.env found, skipping.');
+
+    const lines = fs.readFileSync(file, 'utf8').split('\n');
+    let pendingName = null;
+    let count = 0;
+
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) continue;
+
+        if (line.startsWith('#')) {
+            pendingName = line.replace(/^#+\s*/, '').trim();
+            continue;
+        }
+
+        const eqIdx = line.indexOf('=');
+        if (eqIdx === -1) continue;
+
+        const code = line.slice(0, eqIdx).trim();
+        let url = line.slice(eqIdx + 1).trim();
+        url = url.replace(/^['"]|['"]$/g, ''); // strip surrounding quotes
+
+        if (!code || !url) { pendingName = null; continue; }
+
+        await Webhook.findOneAndUpdate(
+            { code },
+            { name: pendingName || code, code, url },
+            { upsert: true }
+        );
+        count++;
+        pendingName = null;
+    }
+
+    console.log(`[webhooks] Migrated ${count} webhook(s).`);
 }
 
 async function migrateBannedIps() {
@@ -154,11 +193,12 @@ async function migrateMemberCount() {
 
 (async () => {
     await connectDB();
-    await migrateApiKeys();
+    // await migrateApiKeys();
     await migrateBannedIps();
-    await migrateSpreadsheets();
-    await migrateMatches();
-    await migrateMemberCount();
+    // await migrateSpreadsheets();
+    await migrateWebhooks();   
+    // await migrateMatches();
+    // await migrateMemberCount();
     console.log('Migration complete.');
     await mongoose.disconnect();
     process.exit(0);

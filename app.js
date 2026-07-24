@@ -10,7 +10,6 @@ global.__basedir = `${__dirname}`;
 try {
     const dotenv = require('dotenv');
     dotenv.config({ path: path.join(__dirname, 'envs/.env') });
-    dotenv.config({ path: path.join(__dirname, 'envs/webhook.env') });
     console.log('dotenv loaded');
 } catch (error) {
     console.error('Error loading .env:', error);
@@ -27,6 +26,10 @@ const {
     getBannedIpsCache,
     startBannedIpsAutoRefresh,
 } = require('./utils/bannedIps');
+const {
+    refreshWebhooksCache,
+    startWebhooksAutoRefresh,
+} = require('./utils/webhooks');
 const loadRoutes = require('./utils/loadRoutes');
 const { sendDeploymentStatus } = require('./utils/sendDeploymentStatus');
 const { notifyRateLimitExceeded } = require('./utils/notify');
