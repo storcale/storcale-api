@@ -204,9 +204,11 @@ async function init() {
 
         await refreshApiKeysCache();
         await refreshBannedIpsCache();
+        await refreshWebhooksCache();  
         if(!isTestLikeEnv){
             startApiKeysAutoRefresh();
             startBannedIpsAutoRefresh();
+            startWebhooksAutoRefresh();
         }
         
 
