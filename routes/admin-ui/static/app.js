@@ -158,31 +158,52 @@
   // ---------------------------------------------------------------
   // STATS
   // ---------------------------------------------------------------
+  let lastPerDay = {};
+
+  function renderDailyBreakdown() {
+    const list = document.getElementById('dailyStatsList');
+    const daysInput = document.getElementById('statsDays');
+    const n = Math.max(1, Number(daysInput.value) || 14);
+
+    // sort date keys (YYYY-MM-DD) descending so "today" is first, then walk backwards
+    const sortedDates = Object.keys(lastPerDay).sort((a, b) => b.localeCompare(a));
+    const slice = sortedDates.slice(0, n);
+
+    if (!slice.length) { list.innerHTML = '<div class="empty">No data recorded yet.</div>'; return; }
+
+    list.innerHTML = slice.map((date) => `
+      <li class="list-item">
+        <div class="mono">${date}</div>
+        <div class="mono">${lastPerDay[date]} requests</div>
+      </li>
+    `).join('');
+  }
+
   async function loadStats() {
     const grid = document.getElementById('statsGrid');
-    const chartWrap = document.getElementById('statsChart');
     try {
       const res = await fetch('/api/admin-ui/stats', { credentials: 'same-origin' });
       const j = await res.json();
       if (!res.ok) {
         grid.innerHTML = `<div class="empty">${j.error || 'Failed to load'}</div>`;
-        chartWrap.innerHTML = '';
+        document.getElementById('dailyStatsList').innerHTML = '';
         return;
       }
 
       const perDay = j.perDay || {};
-      const perDayStatus = j.perDayStatus || {};
-      const days = Object.keys(perDay).length || 1;
+      lastPerDay = perDay;
+
+      const daysRecorded = Object.keys(perDay).length || 1;
       const total = j.total || 0;
       const values = Object.values(perDay);
-      const avg = (total / days).toFixed(2);
+      const avg = (total / daysRecorded).toFixed(2);
       const max = values.length ? Math.max(...values) : 0;
       const todayKey = new Date().toISOString().slice(0, 10);
       const today = perDay[todayKey] || 0;
 
       const cards = [
         ['Total requests', total],
-        ['Days recorded', days],
+        ['Days recorded', daysRecorded],
         ['Avg / day', avg],
         ['Max / day', max],
         ['Requests (today)', today],
@@ -191,96 +212,13 @@
         <div class="stat-card"><div class="value">${value}</div><div class="label">${label}</div></div>
       `).join('');
 
-      renderStatsChart(perDayStatus, chartWrap);
+      renderDailyBreakdown();
     } catch (e) {
       grid.innerHTML = `<div class="empty">${e.message}</div>`;
     }
-}
+  }
 
-function renderStatsChart(perDayStatus, container) {
-    const dates = Object.keys(perDayStatus).sort();
-    if (!dates.length) { container.innerHTML = '<div class="empty">Not enough data to chart.</div>'; return; }
-
-    const series = [
-      { key: 'total', label: 'Requests', color: 'var(--muted)' },
-      { key: '2xx',   label: '2xx',      color: 'var(--success)' },
-      { key: '3xx',   label: '3xx',      color: 'var(--info)' },
-      { key: '4xx',   label: '4xx',      color: 'var(--accent)' },
-      { key: '5xx',   label: '5xx',      color: 'var(--danger)' },
-    ];
-
-    const width = 760, height = 260, padL = 42, padR = 16, padT = 16, padB = 28;
-    const innerW = width - padL - padR, innerH = height - padT - padB;
-
-    let maxVal = 1;
-    dates.forEach(d => series.forEach(s => {
-      maxVal = Math.max(maxVal, perDayStatus[d][s.key] || 0);
-    }));
-
-    const xStep = dates.length > 1 ? innerW / (dates.length - 1) : 0;
-    const xFor = (i) => padL + i * xStep;
-    const yFor = (v) => padT + innerH - (v / maxVal) * innerH;
-
-    function smoothPath(points) {
-    if (points.length < 2) return '';
-    if (points.length === 2) {
-        return `M ${points[0][0].toFixed(1)} ${points[0][1].toFixed(1)} L ${points[1][0].toFixed(1)} ${points[1][1].toFixed(1)}`;
-    }
-
-    // Catmull-Rom -> cubic Bezier conversion for a smooth, rounded line.
-    // Bump `tension` down (e.g. 3) for tighter curves, up (e.g. 8) for looser/rounder ones.
-    const tension = 6;
-    let d = `M ${points[0][0].toFixed(1)} ${points[0][1].toFixed(1)}`;
-
-    for (let i = 0; i < points.length - 1; i++) {
-        const p0 = points[i === 0 ? 0 : i - 1];
-        const p1 = points[i];
-        const p2 = points[i + 1];
-        const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
-
-        const cp1x = p1[0] + (p2[0] - p0[0]) / tension;
-        const cp1y = p1[1] + (p2[1] - p0[1]) / tension;
-        const cp2x = p2[0] - (p3[0] - p1[0]) / tension;
-        const cp2y = p2[1] - (p3[1] - p1[1]) / tension;
-
-        d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
-    }
-
-    return d;
-}
-
-const pathFor = (key) => smoothPath(
-    dates.map((d, i) => [xFor(i), yFor(perDayStatus[d][key] || 0)])
-);
-
-    const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => {
-      const y = padT + innerH * (1 - f);
-      const val = Math.round(maxVal * f);
-      return `<line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="var(--border)" stroke-width="1"/>
-              <text x="${padL - 8}" y="${y + 4}" font-size="10" fill="var(--muted)" text-anchor="end" font-family="var(--font-mono)">${val}</text>`;
-    }).join('');
-
-    const labelEvery = Math.max(1, Math.ceil(dates.length / 7));
-    const xLabels = dates.map((d, i) => {
-      if (i % labelEvery !== 0 && i !== dates.length - 1) return '';
-      return `<text x="${xFor(i).toFixed(1)}" y="${height - 8}" font-size="10" fill="var(--muted)" text-anchor="middle" font-family="var(--font-mono)">${d.slice(5)}</text>`;
-    }).join('');
-
-    const paths = series.map(s => `<path d="${pathFor(s.key)}" fill="none" stroke="${s.color}" stroke-width="2"/>`).join('');
-
-    const legend = series.map(s => `
-      <span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;font-size:12px;color:var(--muted)">
-        <span style="width:10px;height:10px;border-radius:2px;background:${s.color};display:inline-block"></span>${s.label}
-      </span>`).join('');
-
-    container.innerHTML = `
-      <div style="margin-bottom:10px">${legend}</div>
-      <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;display:block">
-        ${gridLines}
-        ${paths}
-        ${xLabels}
-      </svg>`;
-}
+  document.getElementById('statsDays').addEventListener('input', renderDailyBreakdown);
 
   // ---------------------------------------------------------------
   // BANS
@@ -328,20 +266,14 @@ const pathFor = (key) => smoothPath(
     if (!res.ok) { ul.innerHTML = `<div class="empty">${j.error || 'Failed to load'}</div>`; return; }
     const keys = j.keys || [];
     if (!keys.length) { ul.innerHTML = '<div class="empty">No API keys found.</div>'; return; }
-    ul.innerHTML = keys.map((k) => {
-      const rl = k.rateLimit || {};
-      const windowSec = rl.windowMs ? Math.round(rl.windowMs / 1000) : null;
-      const rateText = rl.limit ? `${rl.limit} req / ${windowSec ?? '?'}s` : '—';
-      return `
-        <li class="list-item">
-          <div><div>${k.name}</div><div class="meta mono">${k.masked || 'no-key'} ${k.perm ? '· ' + k.perm : ''}</div></div>
-          <div class="meta mono" style="min-width:120px; text-align:right">${rateText}</div>
-          <button class="btn btn-sm ${k.valid ? 'btn-danger' : ''}" data-key="${k.id || k.name}" ${!k.valid ? 'disabled' : ''}>
-            ${k.valid ? 'Deactivate' : 'Inactive'}
-          </button>
-        </li>
-      `;
-    }).join('');
+    ul.innerHTML = keys.map((k) => `
+      <li class="list-item">
+        <div><div>${k.name}</div><div class="meta mono">${k.masked || 'no-key'} ${k.perm ? '· ' + k.perm : ''}</div></div>
+        <button class="btn btn-sm ${k.valid ? 'btn-danger' : ''}" data-key="${k.id || k.name}" ${!k.valid ? 'disabled' : ''}>
+          ${k.valid ? 'Deactivate' : 'Inactive'}
+        </button>
+      </li>
+    `).join('');
     ul.querySelectorAll('button[data-key]').forEach((btn) => btn.addEventListener('click', async () => {
       if (!confirm('Deactivate this API key?')) return;
       await fetch('/api/admin-ui/keys/deactivate', {
@@ -351,7 +283,7 @@ const pathFor = (key) => smoothPath(
       });
       loadKeys();
     }));
-}
+  }
 
   // ---------------------------------------------------------------
   // ROUTES EXPLORER
