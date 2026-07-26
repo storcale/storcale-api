@@ -1,4 +1,8 @@
 #!/bin/bash
+if [ -z "$BASH_VERSION" ]; then
+    exec bash "$0" "$@"
+fi
+
 set -e
 
 cd "$(dirname "$0")/.."
@@ -25,7 +29,7 @@ Exit code: ${exit_code}"
             -d "$ntfy_message" \
             "https://ntfy.sh/${NOTIFY_URL}" >/dev/null || true
     else
-        echo "NOTIFY_URL not set in envs/.env, skipping ntfy notification" >&2
+        echo "Error in env for ntfy" >&2
     fi
 
     if [ -n "$WEBHOOK" ]; then
@@ -37,7 +41,7 @@ EOF
             -H "Content-Type: application/json" \
             -d "$payload" >/dev/null || true
     else
-        echo "WEBHOOK not set in envs/.env, skipping discord notification" >&2
+        echo "Error in env for webhook" >&2
     fi
 }
 
@@ -46,10 +50,11 @@ trap notify_failure ERR
 git stash
 git pull
 
+# make sure bind-mounted runtime files exist as files (not dirs) before compose starts
 touch access.log
 touch routes/tniv/DB/match/matches.log
 touch routes/tniv/group/membercount/store.json
 
-timeout 5m docker compose pull
+timeout 10m docker compose build
 timeout 5m docker compose up -d
 docker image prune -f
