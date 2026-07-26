@@ -83,21 +83,39 @@ router.get('/api/admin-ui/logs', requireAuth, (req, res) => {
     } catch (e) { return res.status(500).json({ error: e.message }); }
 });
 
-// API: stats (requests per day + total)
+// API: stats (requests per day + total, broken down by response status class)
 router.get('/api/admin-ui/stats', requireAuth, (req, res) => {
     try {
         const raw = fs.existsSync(LOG_PATH) ? fs.readFileSync(LOG_PATH, 'utf8') : '';
         const lines = raw.split(/\r?\n/).filter(Boolean);
         const total = lines.length;
         const perDay = {};
+        const perDayStatus = {}; // { 'YYYY-MM-DD': { total, errors, '2xx','3xx','4xx','5xx' } }
+
         lines.forEach(l => {
             const m = l.match(/^\[(.*?)\]/);
             if (!m) return;
             const d = new Date(m[1]);
+            if (isNaN(d.getTime())) return;
             const k = d.toISOString().slice(0, 10);
+
             perDay[k] = (perDay[k] || 0) + 1;
+
+            if (!perDayStatus[k]) {
+                perDayStatus[k] = { total: 0, errors: 0, '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 };
+            }
+            perDayStatus[k].total++;
+
+            const statusMatch = l.match(/response:\s*(\d{3})/);
+            if (statusMatch) {
+                const status = statusMatch[1];
+                const cls = `${status[0]}xx`;
+                if (perDayStatus[k][cls] !== undefined) perDayStatus[k][cls]++;
+                if (status[0] === '4' || status[0] === '5') perDayStatus[k].errors++;
+            }
         });
-        return res.json({ total, perDay });
+
+        return res.json({ total, perDay, perDayStatus });
     } catch (e) { return res.status(500).json({ error: e.message }); }
 });
 
@@ -142,7 +160,15 @@ router.get('/api/admin-ui/keys', requireAuth, async (req, res) => {
             if (s.length <= 8) return s.replace(/./g, '*');
             return `${s.slice(0, 4)}...${s.slice(-4)}`;
         }
-        const out = docs.map(d => ({ name: d.name, id: d.name, masked: maskKey(d.key), valid: d.valid !== false, perm: d.perm || '', meta: d.meta || {} }));
+        const out = docs.map(d => ({
+            name: d.name,
+            id: d.name,
+            masked: maskKey(d.key),
+            valid: d.valid !== false,
+            perm: d.perm || '',
+            rateLimit: d.rateLimit || { limit: 30, windowMs: 60 * 1000 },
+            meta: d.meta || {}
+        }));
         return res.json({ keys: out });
     } catch (e) { return res.status(500).json({ error: e.message }); }
 });
