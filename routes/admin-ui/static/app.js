@@ -30,7 +30,7 @@
     }
   });
 
-  const tabs = ['logs', 'stats', 'bans', 'keys', 'routes','webhooks'];
+  const tabs = ['logs', 'stats', 'bans', 'keys', 'routes', 'webhooks'];
   const loaders = {
     logs: loadLogs,
     stats: loadStats,
@@ -154,29 +154,73 @@
   document.getElementById('reloadLogsBtn').addEventListener('click', loadLogs);
   document.getElementById('logSearch').addEventListener('input', filterAndSortLogs);
   document.getElementById('sortBy').addEventListener('change', filterAndSortLogs);
-
   // ---------------------------------------------------------------
   // STATS
   // ---------------------------------------------------------------
   let lastPerDay = {};
+  let lastPerDayStatus = {};
 
-  function renderDailyBreakdown() {
-    const list = document.getElementById('dailyStatsList');
+  function renderStatsChart() {
+    const container = document.getElementById('statsChart');
     const daysInput = document.getElementById('statsDays');
     const n = Math.max(1, Number(daysInput.value) || 14);
 
-    // sort date keys (YYYY-MM-DD) descending so "today" is first, then walk backwards
-    const sortedDates = Object.keys(lastPerDay).sort((a, b) => b.localeCompare(a));
-    const slice = sortedDates.slice(0, n);
+    // ascending order (oldest -> today) so the line reads left-to-right
+    const sortedDates = Object.keys(lastPerDayStatus).sort((a, b) => b.localeCompare(a)).slice(0, n).reverse();
 
-    if (!slice.length) { list.innerHTML = '<div class="empty">No data recorded yet.</div>'; return; }
+    if (!sortedDates.length) { container.innerHTML = '<div class="empty">No data recorded yet.</div>'; return; }
 
-    list.innerHTML = slice.map((date) => `
-      <li class="list-item">
-        <div class="mono">${date}</div>
-        <div class="mono">${lastPerDay[date]} requests</div>
-      </li>
-    `).join('');
+    const series = [
+      { key: 'total', label: 'Requests', color: 'var(--muted)' },
+      { key: '2xx', label: '2xx', color: 'var(--success)' },
+      { key: '3xx', label: '3xx', color: 'var(--info)' },
+      { key: '4xx', label: '4xx', color: 'var(--accent)' },
+      { key: '5xx', label: '5xx', color: 'var(--danger)' },
+    ];
+
+    const width = 760, height = 260, padL = 42, padR = 16, padT = 16, padB = 28;
+    const innerW = width - padL - padR, innerH = height - padT - padB;
+
+    let maxVal = 1;
+    sortedDates.forEach(d => series.forEach(s => {
+      maxVal = Math.max(maxVal, (lastPerDayStatus[d] && lastPerDayStatus[d][s.key]) || 0);
+    }));
+
+    const xStep = sortedDates.length > 1 ? innerW / (sortedDates.length - 1) : 0;
+    const xFor = (i) => padL + i * xStep;
+    const yFor = (v) => padT + innerH - (v / maxVal) * innerH;
+
+    const pathFor = (key) => sortedDates
+      .map((d, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor((lastPerDayStatus[d] && lastPerDayStatus[d][key]) || 0).toFixed(1)}`)
+      .join(' ');
+
+    const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => {
+      const y = padT + innerH * (1 - f);
+      const val = Math.round(maxVal * f);
+      return `<line x1="${padL}" y1="${y}" x2="${width - padR}" y2="${y}" stroke="var(--border)" stroke-width="1"/>
+              <text x="${padL - 8}" y="${y + 4}" font-size="10" fill="var(--muted)" text-anchor="end" font-family="var(--font-mono)">${val}</text>`;
+    }).join('');
+
+    const labelEvery = Math.max(1, Math.ceil(sortedDates.length / 7));
+    const xLabels = sortedDates.map((d, i) => {
+      if (i % labelEvery !== 0 && i !== sortedDates.length - 1) return '';
+      return `<text x="${xFor(i).toFixed(1)}" y="${height - 8}" font-size="10" fill="var(--muted)" text-anchor="middle" font-family="var(--font-mono)">${d.slice(5)}</text>`;
+    }).join('');
+
+    const paths = series.map(s => `<path d="${pathFor(s.key)}" fill="none" stroke="${s.color}" stroke-width="2"/>`).join('');
+
+    const legend = series.map(s => `
+      <span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;font-size:12px;color:var(--muted)">
+        <span style="width:10px;height:10px;border-radius:2px;background:${s.color};display:inline-block"></span>${s.label}
+      </span>`).join('');
+
+    container.innerHTML = `
+      <div style="margin-bottom:10px">${legend}</div>
+      <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;display:block">
+        ${gridLines}
+        ${paths}
+        ${xLabels}
+      </svg>`;
   }
 
   async function loadStats() {
@@ -186,12 +230,14 @@
       const j = await res.json();
       if (!res.ok) {
         grid.innerHTML = `<div class="empty">${j.error || 'Failed to load'}</div>`;
-        document.getElementById('dailyStatsList').innerHTML = '';
+        document.getElementById('statsChart').innerHTML = '';
         return;
       }
 
       const perDay = j.perDay || {};
+      const perDayStatus = j.perDayStatus || {};
       lastPerDay = perDay;
+      lastPerDayStatus = perDayStatus;
 
       const daysRecorded = Object.keys(perDay).length || 1;
       const total = j.total || 0;
@@ -212,14 +258,13 @@
         <div class="stat-card"><div class="value">${value}</div><div class="label">${label}</div></div>
       `).join('');
 
-      renderDailyBreakdown();
+      renderStatsChart();
     } catch (e) {
       grid.innerHTML = `<div class="empty">${e.message}</div>`;
     }
   }
 
-  document.getElementById('statsDays').addEventListener('input', renderDailyBreakdown);
-
+  document.getElementById('statsDays').addEventListener('input', renderStatsChart);
   // ---------------------------------------------------------------
   // BANS
   // ---------------------------------------------------------------
@@ -353,13 +398,13 @@
     list.innerHTML = Object.entries(groups).map(([tag, items]) => `
       <div class="route-group-title">${tag}</div>
       ${items.map((r, i) => {
-        const idx = flatRoutes.indexOf(r);
-        return `
+      const idx = flatRoutes.indexOf(r);
+      return `
         <button class="route-item" data-idx="${idx}">
           <span class="badge ${r.method}">${r.method}</span>
           <span class="path">${r.path}</span>
         </button>`;
-      }).join('')}
+    }).join('')}
     `).join('');
     list.querySelectorAll('.route-item').forEach((btn) => {
       btn.addEventListener('click', () => selectRoute(Number(btn.dataset.idx)));
@@ -495,7 +540,7 @@
 
       const text = await res.text();
       let pretty = text;
-      try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (_) {}
+      try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (_) { }
 
       statusBadge.textContent = `${res.status} ${res.statusText}`;
       statusBadge.classList.add(res.ok ? 'ok' : 'err');
@@ -509,9 +554,9 @@
     }
   }
   // ---------------------------------------------------------------
-// WEBHOOKS
-// ---------------------------------------------------------------
-async function loadWebhookLogs() {
+  // WEBHOOKS
+  // ---------------------------------------------------------------
+  async function loadWebhookLogs() {
     const area = document.getElementById('webhooksArea');
     area.innerHTML = '<div class="empty">Loading…</div>';
 
@@ -525,61 +570,61 @@ async function loadWebhookLogs() {
     params.set('n', n);
 
     try {
-        const res = await fetch(`/api/admin-ui/webhooks/logs?${params.toString()}`, { credentials: 'same-origin' });
-        const j = await res.json();
-        if (!res.ok) { area.innerHTML = `<div class="empty">${j.error || 'Failed to load'}</div>`; return; }
-        const logs = j.logs || [];
-        if (!logs.length) { area.innerHTML = '<div class="empty">No webhook sends match your filters.</div>'; return; }
-        area.innerHTML = logs.map(renderWebhookEntry).join('');
+      const res = await fetch(`/api/admin-ui/webhooks/logs?${params.toString()}`, { credentials: 'same-origin' });
+      const j = await res.json();
+      if (!res.ok) { area.innerHTML = `<div class="empty">${j.error || 'Failed to load'}</div>`; return; }
+      const logs = j.logs || [];
+      if (!logs.length) { area.innerHTML = '<div class="empty">No webhook sends match your filters.</div>'; return; }
+      area.innerHTML = logs.map(renderWebhookEntry).join('');
     } catch (e) {
-        area.innerHTML = `<div class="empty">${e.message}</div>`;
+      area.innerHTML = `<div class="empty">${e.message}</div>`;
     }
-}
+  }
 
-async function loadWebhooksTab() {
+  async function loadWebhooksTab() {
     if (!webhookPickersLoaded) {
-        await loadWebhookPickers();
-        webhookPickersLoaded = true;
+      await loadWebhookPickers();
+      webhookPickersLoaded = true;
     }
     await loadWebhookLogs();
-}
+  }
 
-document.getElementById('refreshWebhooksBtn').addEventListener('click', loadWebhookLogs);
-document.getElementById('webhookCodeFilter').addEventListener('change', loadWebhookLogs);
-document.getElementById('webhookKeyword').addEventListener('keydown', (e) => {
+  document.getElementById('refreshWebhooksBtn').addEventListener('click', loadWebhookLogs);
+  document.getElementById('webhookCodeFilter').addEventListener('change', loadWebhookLogs);
+  document.getElementById('webhookKeyword').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') loadWebhookLogs();
-});
-let webhookPickersLoaded = false;
+  });
+  let webhookPickersLoaded = false;
 
-function escHtml(str) {
+  function escHtml(str) {
     return String(str ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-}
+  }
 
-function decimalToHex(num) {
+  function decimalToHex(num) {
     if (typeof num !== 'number') return '#5865F2';
     return '#' + (num >>> 0).toString(16).padStart(6, '0').slice(-6);
-}
+  }
 
-function renderWebhookEntry(entry) {
+  function renderWebhookEntry(entry) {
     const payload = entry.payload || {};
     const embeds = Array.isArray(payload.embeds) && payload.embeds.length ? payload.embeds : [null];
     const when = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '';
     const content = payload.content ? `<div class="embed-content">${escHtml(payload.content)}</div>` : '';
 
     const embedsHtml = embeds.map((embed) => {
-        if (!embed) return '';
-        const color = decimalToHex(embed.color);
-        const title = embed.title ? `<div class="embed-title">${escHtml(embed.title)}</div>` : '';
-        const desc = embed.description ? `<div class="embed-desc">${escHtml(embed.description)}</div>` : '';
-        const fields = Array.isArray(embed.fields) && embed.fields.length
-            ? `<div class="embed-fields">${embed.fields.map((f) => `
+      if (!embed) return '';
+      const color = decimalToHex(embed.color);
+      const title = embed.title ? `<div class="embed-title">${escHtml(embed.title)}</div>` : '';
+      const desc = embed.description ? `<div class="embed-desc">${escHtml(embed.description)}</div>` : '';
+      const fields = Array.isArray(embed.fields) && embed.fields.length
+        ? `<div class="embed-fields">${embed.fields.map((f) => `
                 <div class="embed-field${f.inline ? ' inline' : ''}">
                   <div class="embed-field-name">${escHtml(f.name)}</div>
                   <div class="embed-field-value">${escHtml(f.value)}</div>
                 </div>`).join('')}</div>`
-            : '';
-        const footer = embed.footer?.text ? `<div class="embed-footer">${escHtml(embed.footer.text)}</div>` : '';
-        return `
+        : '';
+      const footer = embed.footer?.text ? `<div class="embed-footer">${escHtml(embed.footer.text)}</div>` : '';
+      return `
           <div class="discord-embed" style="--embed-color:${color}">
             <div class="embed-bar"></div>
             <div class="embed-body">${title}${desc}${fields}${footer}</div>
@@ -595,18 +640,18 @@ function renderWebhookEntry(entry) {
         ${content}
         ${embedsHtml}
       </div>`;
-}
+  }
 
-async function loadWebhookPickers() {
+  async function loadWebhookPickers() {
     const sel = document.getElementById('webhookCodeFilter');
     try {
-        const res = await fetch('/api/admin-ui/webhooks', { credentials: 'same-origin' });
-        const j = await res.json();
-        const webhooks = j.webhooks || [];
-        sel.innerHTML = '<option value="">All</option>' +
-            webhooks.map((w) => `<option value="${escHtml(w.code)}">${escHtml(w.name)} (${escHtml(w.code)})</option>`).join('');
+      const res = await fetch('/api/admin-ui/webhooks', { credentials: 'same-origin' });
+      const j = await res.json();
+      const webhooks = j.webhooks || [];
+      sel.innerHTML = '<option value="">All</option>' +
+        webhooks.map((w) => `<option value="${escHtml(w.code)}">${escHtml(w.name)} (${escHtml(w.code)})</option>`).join('');
     } catch (e) { /* keep default "All" option */ }
-}
+  }
 
 
 

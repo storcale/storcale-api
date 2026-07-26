@@ -80,17 +80,17 @@
             </div>
           </div>
         </div>
-        <div class="panel">
-          <h2>Daily Breakdown</h2>
-          <div class="row">
-            <div class="field">
-              <label for="statsDays">Days to show</label>
-              <input id="statsDays" type="number" value="14" min="1" max="365" style="width:90px" />
-            </div>
-            <span class="meta" style="align-self:flex-end; padding-bottom:8px">Most recent first, starting today</span>
-          </div>
-          <ul class="list" id="dailyStatsList" style="margin-top:14px"></ul>
-        </div>
+       <div class="panel">
+  <h2>Requests &amp; Errors per Day</h2>
+  <div class="row">
+    <div class="field">
+      <label for="statsDays">Days to show</label>
+      <input id="statsDays" type="number" value="14" min="1" max="365" style="width:90px" />
+    </div>
+    <span class="meta" style="align-self:flex-end; padding-bottom:8px">Most recent first, starting today</span>
+  </div>
+  <div id="statsChart" style="margin-top:14px">Loading…</div>
+</div>
       </section>
 
       <!-- BANS -->
