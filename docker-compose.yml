@@ -1,7 +1,6 @@
 services:
   api:
-    build: .
-    image: storcale-api:latest
+    image: ghcr.io/storcale/storcale-api:latest  # Pull pre-built image
     container_name: storcale-api
     restart: unless-stopped
     ports:
@@ -12,5 +11,6 @@ services:
     volumes:
       - ./envs:/app/envs
       - ./access.log:/app/access.log
+      - ./logs:/app/logs
       - ./routes/tniv/DB/match/matches.log:/app/routes/tniv/DB/match/matches.log
       - ./routes/tniv/group/membercount/store.json:/app/routes/tniv/group/membercount/store.json
