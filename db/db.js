@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 let isConnected = false;
+let eicConnection = null;
 
 /**
  * Connects to MongoDB using process.env.MONGODB_URI.
@@ -17,10 +18,13 @@ async function connectDB() {
     mongoose.set('strictQuery', true);
 
     await mongoose.connect(uri, {
-    dbName: 'api',
-    serverSelectionTimeoutMS: 10000,
-});
+        dbName: 'api',
+        serverSelectionTimeoutMS: 10000,
+    });
 
+    // eic
+    eicConnection = mongoose.connection.useDb('eic', { useCache: true });
+    console.log("Connected to EIC registry")
     isConnected = true;
     console.timeEnd('DB Connected');
 
@@ -28,13 +32,21 @@ async function connectDB() {
         isConnected = false;
         console.warn('MongoDB disconnected.');
     });
-    if(process.env.NODE_ENV === "development" || process.env.NODE_EJV === "test" ){
+    if (process.env.NODE_ENV === "development" || process.env.NODE_EJV === "test") {
         mongoose.set("debug", true);
     }
     return mongoose.connection;
 }
+
+function getEicConnection() {
+    if (!eicConnection) {
+        throw new Error('EIC connection not initialized');
+    }
+    return eicConnection;
+}
+
 async function disconnectDB() {
     await mongoose.disconnect();
 }
 
-module.exports = { connectDB, disconnectDB, mongoose };
+module.exports = { connectDB, disconnectDB, mongoose, getEicConnection };
