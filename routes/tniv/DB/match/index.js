@@ -177,11 +177,10 @@ router.delete('/', async (req, res) => {
  */
 router.get('/', async (req, res) => {
     try {
-        console.log("match accessed!")
         const sessionId = req.query.sessionId;
         const filter = sessionId ? { sessionId } : {};
-        const matches = await Match.find(filter).sort({ createdAt: 1 }).lean();
-        return res.status(200).json({ body: matches.map(m => m.data) });
+        const matches = await Match.find(filter)
+        return res.status(200).json({ body: matches });
     } catch (err) {
         console.error('Error reading matches:', err);
         return res.status(500).json({ error: 'Internal server error' });

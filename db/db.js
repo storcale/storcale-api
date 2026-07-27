@@ -24,7 +24,7 @@ async function connectDB() {
 
     // eic
     eicConnection = mongoose.connection.useDb('eic', { useCache: true });
-
+    console.log("Connected to EIC registry")
     isConnected = true;
     console.timeEnd('DB Connected');
 
