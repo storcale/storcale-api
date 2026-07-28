@@ -178,8 +178,20 @@ router.delete('/', async (req, res) => {
 router.get('/', async (req, res) => {
     try {
         const sessionId = req.query.sessionId;
-        const filter = sessionId ? { sessionId } : {};
-        const matches = await Match.find(filter)
+        let filter = sessionId ? { sessionId } : {};
+
+        const includeLogs = req.query.logs === "true";
+        const includePlayTimeList = req.query.playTimeList === "true";
+        const includeTerminalStateHistory = req.query.terminalStateHistory === "true";
+        const includeLeaderstats = req.query.leaderstats === "true";
+
+        const projection = {};
+
+        if (!includeLogs) projection["data.logs"] = 0;
+        if (!includePlayTimeList) projection["data.playTimeList"] = 0;
+        if (!includeTerminalStateHistory) projection["data.terminalStateHistory"] = 0;
+        if (!includeLeaderstats) projection["data.leaderstats"] = 0;
+        const matches = await Match.find(filter).select(projection).lean()
         return res.status(200).json({ body: matches });
     } catch (err) {
         console.error('Error reading matches:', err);
