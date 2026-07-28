@@ -6,6 +6,7 @@ const querystring = require('node:querystring');
 const env = String(process.env.NODE_ENV || 'development').toLowerCase();
 app.use(express.json());
 global.__basedir = `${__dirname}`;
+app.set('trust proxy', 1);
 
 try {
     const dotenv = require('dotenv');
@@ -88,7 +89,7 @@ app.use((req, res, next) => {
     if (!req.originalUrl.startsWith('/api/')) return next();
     const apiKey = req.get('api-key') || req.query?.['api-key'] || 'none';
     const timestamp = req.get('timestamp') || 'none';
-    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     const body = req.body ? `- body: ${JSON.stringify(req.body)}` : '';
     const query = Object.keys(req.query).length > 0 ? querystring.stringify(req.query) : 'No Query';
