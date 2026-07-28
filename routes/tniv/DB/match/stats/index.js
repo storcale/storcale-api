@@ -279,13 +279,7 @@ function buildStats(matches) {
  *         schema:
  *           type: integer
  *         description: Minimum number of defenders.
- *
- *       - in: query
- *         name: includeMatches
- *         schema:
- *           type: boolean
- *         description: Include the normalized match list in the response.
- *
+ * 
  *     responses:
  *       200:
  *         description: Statistics generated successfully.
@@ -321,11 +315,6 @@ function buildStats(matches) {
  *                       type: object
  *                       additionalProperties:
  *                         type: integer
- *                 matches:
- *                   type: array
- *                   description: Present only when includeMatches=true.
- *                   items:
- *                     type: object
  *
  *       500:
  *         description: Internal server error.
@@ -345,25 +334,35 @@ router.get("/", async (req, res) => {
                 ...mongoQuery.endTime,
                 $lte: Number(req.query.until),
             };
-
+        console.log(await Match.countDocuments());
+        console.time("Query")
         const docs = await Match.find(mongoQuery)
-            .select("data")
-            .lean();
-
+            .select({
+                "data.startTime": 1,
+                "data.endTime": 1,
+                "data.config": 1,
+                "data.placeId": 1,
+                "data.placeName": 1,
+                "data.attackerPoints": 1,
+                "data.defenderPoints": 1,
+                "data.ended": 1,
+                "data.serverLocation": 1,
+                "data.version": 1,
+            })
+            .lean()
+        console.timeEnd("Query")
+        console.time("get matches")
         const matches = applyFilters(
             docs.map(doc => normalizeMatch(doc.data)),
             req.query
         );
-
+        console.timeEnd("get matches")
+        console.time("Build stats")
         const stats = buildStats(matches);
-
+        console.timeEnd("Build stats")
         const response = {
             stats,
         };
-
-        if (req.query.includeMatches === "true") {
-            response.matches = matches;
-        }
 
         res.json(response);
     } catch (err) {

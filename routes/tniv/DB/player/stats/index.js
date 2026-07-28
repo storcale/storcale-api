@@ -91,48 +91,80 @@ function normalizeMatch(obj) {
 
     const leaderstats = {};
     const playTimeList = {};
-    const allPlayers = [...(obj.defendersPlayerList || []), ...(obj.attackersPlayerList || [])];
+
+    const allPlayers = [
+        ...(obj.defendersPlayerList || []),
+        ...(obj.attackersPlayerList || []),
+    ];
 
     for (const player of allPlayers) {
         const uid = String(player.userId);
         const statsObj = {};
-        for (const stat of (player.statistics || [])) statsObj[stat.name] = stat.value;
-        leaderstats[uid] = { Kills: statsObj.Kills || 0, Deaths: statsObj.Deaths || 0, Ping: statsObj.Ping || 0 };
-        playTimeList[uid] = { defenders: player.Playtime || 0, attackers: 0 };
-    }
 
-    const logs = (obj.logs || []).map(log => ({ ...log, userId: log.userId != null ? String(log.userId) : null }));
-
-    return { ...obj, placeName: obj.gameName, leaderstats, playTimeList, logs, date: obj.matchStartTime ?? obj.date };
-}
-
-async function loadFilteredMatches(from, since, to, until, map) {
-    const dateFrom = from || since;
-    const dateTo = to || until;
-    const docs = await Match.find({}).lean();
-    const result = [];
-
-    for (const doc of docs) {
-        const obj = normalizeMatch(doc.data);
-        if (map && obj.placeName && !obj.placeName.includes(map)) continue;
-
-        if (dateFrom || dateTo) {
-            let d = null;
-            if (obj.matchStartTime) d = new Date(obj.matchStartTime * 1000);
-            else d = parseDate(obj.date || obj.timestamp || obj.startTime);
-
-            const fromDate = parseDate(dateFrom);
-            const toDate = parseDate(dateTo);
-
-            if (dateFrom && fromDate && !isNaN(fromDate.getTime()) && d && d < fromDate) continue;
-            if (dateTo && toDate && !isNaN(toDate.getTime()) && d && d > toDate) continue;
+        for (const stat of player.statistics || []) {
+            statsObj[stat.name] = stat.value;
         }
 
-        result.push(obj);
+        leaderstats[uid] = {
+            Kills: statsObj.Kills || 0,
+            Deaths: statsObj.Deaths || 0,
+            Ping: statsObj.Ping || 0,
+        };
+
+        playTimeList[uid] = {
+            defenders: player.Playtime || 0,
+            attackers: 0,
+        };
     }
 
-    return result;
+    return {
+        ...obj,
+        placeName: obj.gameName,
+        leaderstats,
+        playTimeList,
+        logs: (obj.logs || []).map(log => ({
+            ...log,
+            userId: log.userId != null ? String(log.userId) : null,
+        })),
+        date: obj.matchStartTime ?? obj.date,
+    };
 }
+
+
+async function loadFilteredMatches(from, since, to, until, map) {
+    const dateFrom = parseDate(from || since);
+    const dateTo = parseDate(to || until);
+
+    const query = {};
+
+    if (dateFrom && !isNaN(dateFrom.getTime())) {
+        query.matchStartTime = {
+            $gte: Math.floor(dateFrom.getTime() / 1000),
+        };
+    }
+
+    if (dateTo && !isNaN(dateTo.getTime())) {
+        query.endTime = {
+            $lte: Math.floor(dateTo.getTime() / 1000),
+        };
+    }
+
+    if (map) {
+        query["data.gameName"] = {
+            $regex: map,
+            $options: "i",
+        };
+    }
+
+    const docs = await Match.find(query)
+        .select({
+            data: 1,
+        })
+        .lean();
+
+    return docs.map(doc => normalizeMatch(doc.data));
+}
+
 
 function buildGlobalStatsFromMatches(matchObjs, minKills) {
     minKills = Number(minKills) || 1;

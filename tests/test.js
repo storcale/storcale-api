@@ -101,7 +101,7 @@ describe("TNIV/DB", () => {
 
         test("Get global stats", async () => {
             await runTest("Get global stats", async () => {
-                await agent.get("/api/tniv/db/player/stats").query({ from: "02/02/2026", to: "03/03/2026" }).expect(200).expect(res => {
+                await agent.get("/api/tniv/db/player/stats").expect(200).expect(res => {
                     if (typeof res.body.totalKills !== "number" || res.body.totalKills < 1) throw new Error("Missing kill statistics");
                 });
             });
@@ -175,6 +175,11 @@ describe("EIC/Case", () => {
     test("Get a Case", async () => {
         await runTest("Get a Case", async () => {
             await agent.get("/api/eic/case").query({username: "bacon",caseId:0}).expect(200)
+        })
+    })
+    test("Log a ban", async () => {
+        await runTest("Log a ban", async () => {
+            await agent.get("/api/eic/case").query({caseId:0, gameId:67}).expect(200)
         })
     })
     test("Delete a Case", async () => {

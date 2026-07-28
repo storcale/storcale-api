@@ -11,7 +11,7 @@ const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
  *     security:
  *       - apiKey: []
  *     tags:
- *       - eic/Case
+ *       - EIC/Case
  *     requestBody:
  *       required: true
  *       content:
@@ -49,7 +49,7 @@ router.post('/', async (req, res) => {
             robloxUsername: caseData.robloxUsername,
             robloxId: caseData.robloxId || 0,
             weaponMechanic: caseData.weaponMechanic,
-            activeBannedGames: {}
+            activeBannedGames: []
         });
         return res.status(200).json({ body: 'Created!', caseId: caseData.caseId });
     } catch (err) {
@@ -69,7 +69,7 @@ router.post('/', async (req, res) => {
  *     security:
  *       - apiKey: []
  *     tags:
- *       - eic/Case
+ *       - EIC/Case
 *     parameters:
  *       - in: query
  *         name: caseId
@@ -103,12 +103,16 @@ router.delete('/', async (req, res) => {
     }
 
     try {
-        caseid = caseId ? caseId : {}
-        const eicCases = await Case.find({ caseId: caseId, robloxUsername: username });
-        if (eicCases) {
-            await Case.deleteMany({ caseId: caseId, robloxUsername: username })
+        let filter = {};
+        if (caseId) filter.caseId = caseId;
+        if (username) filter.robloxUsername = username;
+        const result = await Case.deleteMany(filter);
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ error: "Not found" });
         }
-        return res.status(200).json({ body: 'Deleted entries matching the query.' });
+        return res.status(200).json({
+            body: "Deleted entries matching the query."
+        });
     } catch (err) {
         console.error('Error deleting case:', err);
         return res.status(500).json({ error: 'Internal server error' });
@@ -123,7 +127,7 @@ router.delete('/', async (req, res) => {
  *     security:
  *       - apiKey: []
  *     tags:
- *       - eic/Case
+ *       - EIC/Case
  *     parameters:
  *       - in: query
  *         name: caseId
@@ -132,11 +136,17 @@ router.delete('/', async (req, res) => {
  *           type: string
  *         description: If provided, returns only cases with that caseId 
  *       - in: query
- *         name: caseId
+ *         name: username
  *         required: false
  *         schema:
- *           type: string
+ *           type: number
  *         description: If provided, returns only cases with that roblox username
+ *       - in: query
+ *         name: gameId
+ *         required: false
+ *         schema:
+ *           type: number
+ *         description: If provided, returns only cases that dont include that game ID in their active banned games.
  *     responses:
  *       200:
  *         description: case data successfully retrieved
@@ -151,14 +161,73 @@ router.get('/', async (req, res) => {
     try {
         const caseId = req.query.caseId || null
         const username = req.query.username || ""
-        const cases = await Case.find({ caseId: caseId, robloxUsername: username }).sort({ createdAt: 1 }).lean();
+        const gameId = req.query.gameId || null
+        let filter = {}
+        if (caseId) { filter.caseId = caseId }
+        if (username) { filter.robloxUsername = username }
+        if (gameId) { filter.activeBannedGames = { '$ne': gameId } }
+        const cases = await Case.find(filter).sort({ createdAt: 1 }).lean();
         if (cases.length) {
             return res.status(200).json({ body: cases });
         } else {
-            return res.status(404).json({});
+            return res.status(404).json({ error: "Not found" });
         }
     } catch (err) {
         console.error('Error reading cases:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+/**
+ * @swagger
+ * /eic/Case:
+ *   patch:
+ *     summary: Log a case banned on a game
+ *     security:
+ *       - apiKey: []
+ *     tags:
+ *       - EIC/Case
+ *     parameters:
+ *       - in: query
+ *         name: caseId
+ *         required: false
+ *         schema:
+ *           oneOf:
+ *             - type: number
+ *             - type: array
+ *         description: Log banned for those/that caseId
+ *       - in: query
+ *         name: gameId
+ *         required: false
+ *         schema:
+ *           type: number
+ *         description: The gameId the case has been flagged banned in.
+ *     responses:
+ *       200:
+ *         description: case data successfully retrieved
+ *       401:
+ *         description: No api-key provided
+ *       403:
+ *         description: Invalid api-key for resource
+ *       500:
+ *         description: Server error
+ */
+router.patch('/', async (req, res) => {
+    try {
+        const caseId = req.query.caseId
+        const gameId = req.query.gameId
+        if (!caseId || !gameId) { return res.status(400).json({ error: 'Missing parameters' }) }
+        let result = {}
+        if (Array.isArray(caseId)) {
+            result = await Case.updateMany({ caseId: { "$in": caseId } }, { $push: { activeBannedGames: gameId } });
+        } else {
+            result = await Case.updateOne({ caseId: caseId }, { $push: { activeBannedGames: gameId } });
+        }
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: "Not found" });
+        }
+        return res.status(200).json({ message: 'Sucess! Modified documents: ' + result.modifiedCount })
+    } catch (err) {
+        console.error('Error modifying case:', err);
         return res.status(500).json({ error: 'Internal server error' });
     }
 });
