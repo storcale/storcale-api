@@ -23,7 +23,7 @@ const METRICS = {
  *         description: API is running fine
  */
 router.get('/', async (req, res) => {
-    res.status(200).json({ "sucess": true })
+    return res.status(200).json({ "sucess": true })
 });
 
 /**
@@ -49,16 +49,16 @@ router.get('/stats', (req, res) => {
     try {
         const stats = getStats();
         if (req.query.metric === "all") {
-            res.status(200).json(stats)
+            return res.status(200).json(stats)
         }
         const metricKey = METRICS[req.query.metric] ? req.query.metric : 'total';
         const base = METRICS[metricKey](stats);
 
-        res.status(200).json({
+        return res.status(200).json({
             metric: base.message
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return res.status(500).json({ error: err.message });
     }
 });
 
@@ -100,14 +100,14 @@ router.get('/stats/badge', (req, res) => {
         const metricKey = METRICS[req.query.metric] ? req.query.metric : 'total';
         const base = METRICS[metricKey](stats);
 
-        res.status(200).json({
+        return res.status(200).json({
             schemaVersion: 1,
             label: req.query.label || base.label,
             message: base.message,
             color: req.query.color || base.color,
         });
     } catch (err) {
-        res.status(200).json({
+        return res.status(200).json({
             schemaVersion: 1,
             label: 'requests',
             message: 'error',
