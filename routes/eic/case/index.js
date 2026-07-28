@@ -54,7 +54,7 @@ router.post('/', async (req, res) => {
         return res.status(200).json({ body: 'Created!', caseId: caseData.caseId });
     } catch (err) {
         if (err.code === 11000) {
-            return res.status(400).json({ error: `Case with id ${caseData.caseId} already exists.` });
+            return res.status(409).json({ error: `Case with id ${caseData.caseId} already exists.` });
         }
         console.error('Error logging case:', err);
         return res.status(500).json({ error: 'Internal server error' });
