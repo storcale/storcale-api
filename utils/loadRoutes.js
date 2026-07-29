@@ -10,33 +10,78 @@ const PUBLIC_DIRS = (process.env.PUBLIC_DIRS || '')
     .map((d) => d.trim().toLowerCase())
     .filter(Boolean);
 
-function getAllowedKeysForEndpoint(endpointPath) {
+
+const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'];
+
+function normalizeScopePath(p) {
+    return String(p || '')
+        .toLowerCase()
+        .trim()
+        .replace(/^\/+|\/+$/g, '');
+}
+
+
+function parseScopeToken(rawToken) {
+    const normalized = normalizeScopePath(rawToken);
+    if (!normalized) return null;
+
+    const segments = normalized.split('/');
+    const lastSegment = segments[segments.length - 1];
+
+    if (segments.length > 1 && HTTP_METHODS.includes(lastSegment)) {
+        return {
+            path: segments.slice(0, -1).join('/'),
+            method: lastSegment,
+            cascades: false,
+        };
+    }
+
+    return { path: normalized, method: null, cascades: true };
+}
+
+
+function scopeCoversEndpoint(scope, endpointPath) {
+    if (scope.path === endpointPath) return true;
+    if (!scope.cascades) return false;
+    return endpointPath.startsWith(`${scope.path}/`);
+}
+
+function getAllowedKeysForEndpoint(endpointPath, method) {
     const apiKeysJson = getApiKeysCache();
-    const perms = {};
-    const allKeys = [];
+    const normalizedEndpoint = normalizeScopePath(endpointPath);
+    const normalizedMethod = String(method || '').toLowerCase();
+
+    const matchedKeys = new Set();
+    const allKeys = new Set();
 
     for (const entry of Object.values(apiKeysJson || {})) {
         if (!entry || entry.valid === false) continue;
         const key = entry.key;
         const keyPerms = (entry.perm || '').split(',').map((p) => p.trim()).filter(Boolean);
 
-        keyPerms.forEach((p) => {
-            perms[p] = perms[p] || [];
-            perms[p].push(key);
-        });
+        for (const rawToken of keyPerms) {
+            if (rawToken.toLowerCase() === 'all') {
+                allKeys.add(key);
+                continue;
+            }
 
-        if (keyPerms.includes('all')) {
-            allKeys.push(key);
+            const scope = parseScopeToken(rawToken);
+            if (!scope) continue;
+
+            if (!scopeCoversEndpoint(scope, normalizedEndpoint)) continue;
+            // A method-scoped token only grants that specific method.
+            if (scope.method && scope.method !== normalizedMethod) continue;
+
+            matchedKeys.add(key);
         }
     }
 
-    const endpointKeys = perms[endpointPath] || [];
-    return Array.from(new Set([...endpointKeys, ...allKeys]));
+    return Array.from(new Set([...matchedKeys, ...allKeys]));
 }
 
 function apiKeyMiddleware(endpointPath) {
     return (req, res, next) => {
-        const allowedKeys = getAllowedKeysForEndpoint(endpointPath);
+        const allowedKeys = getAllowedKeysForEndpoint(endpointPath, req.method);
 
         // support session token for admin UI: 'x-admin-session' header
         const sessionToken = req.get('x-admin-session') || req.query?.['admin-session'];
@@ -98,3 +143,7 @@ function loadRoutes(app, routesDir, baseUrl = '/api') {
 }
 
 module.exports = loadRoutes;
+
+module.exports.getAllowedKeysForEndpoint = getAllowedKeysForEndpoint;
+module.exports.parseScopeToken = parseScopeToken;
+module.exports.scopeCoversEndpoint = scopeCoversEndpoint;
