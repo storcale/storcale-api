@@ -20,23 +20,69 @@ const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
  *             type: object
  *             required:
  *               - caseId
+ *               - robloxUsername
+ *               - weaponMechanic
  *             properties:
  *               caseId:
+ *                 type: integer
+ *                 description: Unique case identifier.
+ *               robloxUsername:
  *                 type: string
- *                 description: Unique case identifier
- *             additionalProperties: true
+ *                 description: Roblox username associated with the case.
+ *               robloxId:
+ *                 type: integer
+ *                 description: Roblox user ID.
+ *                 default: 0
+ *               weaponMechanic:
+ *                 type: string
+ *                 description: Weapon mechanic associated with the case.
  *     responses:
  *       200:
- *         description: case entry logged
+ *         description: Case entry logged successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 body:
+ *                   type: string
+ *                   example: Created!
+ *                 caseId:
+ *                   type: integer
  *       400:
- *         description: Invalid case data
+ *         description: Invalid case data.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Invalid case data
  *       401:
- *         description: No api-key provided
+ *         description: No API key provided.
  *       403:
- *         description: Invalid api-key for resource
+ *         description: Invalid API key for resource.
+ *       409:
+ *         description: Case with the provided caseId already exists.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  *       500:
- *         description: Server error
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
+
 router.post('/', async (req, res) => {
     const caseData = req.body;
     if (!caseData || caseData.caseId === undefined || caseData.caseId === null || !caseData.robloxUsername || !caseData.weaponMechanic) {
@@ -60,41 +106,72 @@ router.post('/', async (req, res) => {
         return res.status(500).json({ error: 'Internal server error' });
     }
 });
-
 /**
  * @swagger
  * /eic/Case:
  *   delete:
- *     summary: Delete case entries. Multiple query parameters will find a match with all the parameters
+ *     summary: Delete case entries. Multiple query parameters are combined using AND logic.
  *     security:
  *       - apiKey: []
  *     tags:
  *       - EIC/Case
-*     parameters:
+ *     parameters:
  *       - in: query
  *         name: caseId
  *         required: false
  *         schema:
- *           type: string
- *         description: Filter cases by caseId
+ *           type: integer
+ *         description: Filter cases by case ID.
  *       - in: query
  *         name: username
  *         required: false
  *         schema:
  *           type: string
- *         description: Filter cases by roblox username
+ *         description: Filter cases by Roblox username.
  *     responses:
  *       200:
- *         description: case entry deleted
+ *         description: Matching case entries deleted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 body:
+ *                   type: string
+ *                   example: Deleted entries matching the query.
  *       400:
- *         description: Invalid case data
+ *         description: No valid search parameters were provided.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  *       401:
- *         description: No api-key provided
+ *         description: No API key provided.
  *       403:
- *         description: Invalid api-key for resource
+ *         description: Invalid API key for resource.
+ *       404:
+ *         description: No matching case entries found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  *       500:
- *         description: Server error
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
+
 router.delete('/', async (req, res) => {
     const caseId = req.query.caseId;
     const username = req.query.username;
@@ -118,12 +195,11 @@ router.delete('/', async (req, res) => {
         return res.status(500).json({ error: 'Internal server error' });
     }
 });
-
 /**
  * @swagger
  * /eic/Case:
  *   get:
- *     summary: Get all cases or filter by caseId. Multiple query parameters will find a match with all the parameters
+ *     summary: Get case entries. Multiple query parameters are combined using AND logic.
  *     security:
  *       - apiKey: []
  *     tags:
@@ -133,30 +209,75 @@ router.delete('/', async (req, res) => {
  *         name: caseId
  *         required: false
  *         schema:
- *           type: string
- *         description: If provided, returns only cases with that caseId 
+ *           type: integer
+ *         description: Return only the case with this case ID.
  *       - in: query
  *         name: username
  *         required: false
  *         schema:
- *           type: number
- *         description: If provided, returns only cases with that roblox username
+ *           type: string
+ *         description: Return only cases matching this Roblox username.
  *       - in: query
  *         name: gameId
  *         required: false
  *         schema:
- *           type: number
- *         description: If provided, returns only cases that dont include that game ID in their active banned games.
+ *           type: integer
+ *         description: Return only cases that are not currently banned for this game ID.
  *     responses:
  *       200:
- *         description: case data successfully retrieved
+ *         description: Case data successfully retrieved.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 body:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       caseId:
+ *                         type: integer
+ *                       robloxUsername:
+ *                         type: string
+ *                       robloxId:
+ *                         type: integer
+ *                       weaponMechanic:
+ *                         type: string
+ *                       activeBannedGames:
+ *                         type: array
+ *                         items:
+ *                           type: integer
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
  *       401:
- *         description: No api-key provided
+ *         description: No API key provided.
  *       403:
- *         description: Invalid api-key for resource
+ *         description: Invalid API key for resource.
+ *       404:
+ *         description: No matching cases found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  *       500:
- *         description: Server error
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
+
 router.get('/', async (req, res) => {
     try {
         const caseId = req.query.caseId || null
@@ -181,7 +302,7 @@ router.get('/', async (req, res) => {
  * @swagger
  * /eic/Case:
  *   patch:
- *     summary: Log a case banned on a game
+ *     summary: Record that one or more cases have been banned in a game.
  *     security:
  *       - apiKey: []
  *     tags:
@@ -189,28 +310,64 @@ router.get('/', async (req, res) => {
  *     parameters:
  *       - in: query
  *         name: caseId
- *         required: false
+ *         required: true
  *         schema:
  *           oneOf:
- *             - type: number
+ *             - type: integer
  *             - type: array
- *         description: Log banned for those/that caseId
+ *               items:
+ *                 type: integer
+ *         description: Single case ID or multiple case IDs supplied as repeated query parameters.
  *       - in: query
  *         name: gameId
- *         required: false
+ *         required: true
  *         schema:
- *           type: number
- *         description: The gameId the case has been flagged banned in.
+ *           type: integer
+ *         description: Game ID to add to the active banned games list.
  *     responses:
  *       200:
- *         description: case data successfully retrieved
+ *         description: Case(s) updated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Success! Modified documents 2
+ *       400:
+ *         description: Missing required parameters.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  *       401:
- *         description: No api-key provided
+ *         description: No API key provided.
  *       403:
- *         description: Invalid api-key for resource
+ *         description: Invalid API key for resource.
+ *       404:
+ *         description: No matching case entries found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  *       500:
- *         description: Server error
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
+
 router.patch('/', async (req, res) => {
     try {
         const caseId = req.query.caseId
