@@ -95,7 +95,8 @@ router.post('/', async (req, res) => {
             robloxUsername: caseData.robloxUsername,
             robloxId: caseData.robloxId || 0,
             weaponMechanic: caseData.weaponMechanic,
-            activeBannedGames: []
+            activeBannedGames: [],
+            active: true
         });
         return res.status(200).json({ body: 'Created!', caseId: caseData.caseId });
     } catch (err) {
@@ -110,7 +111,7 @@ router.post('/', async (req, res) => {
  * @swagger
  * /eic/Case:
  *   delete:
- *     summary: Delete case entries. Multiple query parameters are combined using AND logic.
+ *     summary: Mark case entries as inactive and remove a game from their active banned games list. Multiple query parameters are combined using AND logic.
  *     security:
  *       - apiKey: []
  *     tags:
@@ -130,7 +131,7 @@ router.post('/', async (req, res) => {
  *         description: Filter cases by Roblox username.
  *     responses:
  *       200:
- *         description: Matching case entries deleted.
+ *         description: Matching case entries were updated.
  *         content:
  *           application/json:
  *             schema:
@@ -138,9 +139,9 @@ router.post('/', async (req, res) => {
  *               properties:
  *                 body:
  *                   type: string
- *                   example: Deleted entries matching the query.
+ *                   example: Made inactive entries matching the query.
  *       400:
- *         description: No valid search parameters were provided.
+ *         description: Missing required parameters.
  *         content:
  *           application/json:
  *             schema:
@@ -148,6 +149,7 @@ router.post('/', async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
+ *                   example: Missing parameters. Username is at least required
  *       401:
  *         description: No API key provided.
  *       403:
@@ -171,27 +173,25 @@ router.post('/', async (req, res) => {
  *                 error:
  *                   type: string
  */
-
 router.delete('/', async (req, res) => {
     const caseId = req.query.caseId;
     const username = req.query.username;
-    if ((caseId === undefined || caseId === null) && !username) {
-        return res.status(400).json({ error: 'username is at least required' });
+    if (((caseId === undefined || caseId === null ) && !username) ) {
+        return res.status(400).json({ error: 'Missing parameters. Username is at least required' });
     }
-
     try {
         let filter = {};
         if (caseId) filter.caseId = caseId;
         if (username) filter.robloxUsername = username;
-        const result = await Case.deleteMany(filter);
-        if (result.deletedCount === 0) {
+        const result = await Case.updateMany(filter,{$set: { active: false }});
+        if (result.matchedCount === 0) {
             return res.status(404).json({ error: "Not found" });
         }
         return res.status(200).json({
-            body: "Deleted entries matching the query."
+            body: "Made inactive entries matching the query."
         });
     } catch (err) {
-        console.error('Error deleting case:', err);
+        console.error('Error making case inactive case:', err);
         return res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -301,7 +301,7 @@ router.get('/', async (req, res) => {
 /**
  * @swagger
  * /eic/Case:
- *   patch:
+ *   put:
  *     summary: Record that one or more cases have been banned in a game.
  *     security:
  *       - apiKey: []
@@ -368,7 +368,7 @@ router.get('/', async (req, res) => {
  *                   type: string
  */
 
-router.patch('/', async (req, res) => {
+router.put('/', async (req, res) => {
     try {
         const caseId = req.query.caseId
         const gameId = req.query.gameId
@@ -385,6 +385,103 @@ router.patch('/', async (req, res) => {
         return res.status(200).json({ message: 'Sucess! Modified documents: ' + result.modifiedCount })
     } catch (err) {
         console.error('Error modifying case:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
+ * /eic/Case:
+ *   patch:
+ *     summary: Remove a game ban log from one or more case entries. Multiple query parameters are combined using AND logic.
+ *     security:
+ *       - apiKey: []
+ *     tags:
+ *       - EIC/Case
+ *     parameters:
+ *       - in: query
+ *         name: caseId
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Filter cases by case ID.
+ *       - in: query
+ *         name: username
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter cases by Roblox username.
+ *       - in: query
+ *         name: gameId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Game ID to remove from the active banned games list.
+ *     responses:
+ *       200:
+ *         description: Ban log removed successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 body:
+ *                   type: string
+ *                   example: Removed ban log on that case for 123456
+ *       400:
+ *         description: Missing required parameters.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: Missing parameters. Username is at least required
+ *       401:
+ *         description: No API key provided.
+ *       403:
+ *         description: Invalid API key for resource.
+ *       404:
+ *         description: No matching case entries found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *       500:
+ *         description: Internal server error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
+
+router.patch('/', async (req, res) => {
+    const caseId = req.query.caseId;
+    const username = req.query.username;
+    const gameId = req.query.gameId
+    if (((caseId === undefined || caseId === null ) && !username) || !gameId ) {
+        return res.status(400).json({ error: 'Missing parameters. Username is at least required' });
+    }
+    try {
+        let filter = {};
+        if (caseId) filter.caseId = caseId;
+        if (username) filter.robloxUsername = username;
+        const result = await Case.updateMany(filter,{$pull: { activeBannedGames: gameId }});
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: "Not found" });
+        }
+        return res.status(200).json({
+            body: "Removed ban log on that case for "+gameId
+        });
+    } catch (err) {
+        console.error('Error making removing game ban log from case:', err);
         return res.status(500).json({ error: 'Internal server error' });
     }
 });
