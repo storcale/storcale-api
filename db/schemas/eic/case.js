@@ -6,7 +6,8 @@ const caseSchema = new (require('mongoose')).Schema({
     robloxUsername: { type: String, required: true},
     robloxId: { type: Number, required: true},
     weaponMechanic: {type: String, required: true},
-    activeBannedGames: {type:Array, required: true}
+    activeBannedGames: {type:Array, required: true},
+    active: {type:Boolean,required: true}
 });
 
 const eicConn = getEicConnection();

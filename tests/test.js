@@ -3,6 +3,7 @@ const disconnectDb = require("../db/db.js").disconnectDB;
 const results = [];
 const logFilePath = path.join(__dirname, "../access.log");
 
+
 function log(message) {
     const line = `[${new Date().toISOString()}] ${message}`;
     console.log(line);
@@ -182,9 +183,16 @@ describe("EIC/Case", () => {
             await agent.get("/api/eic/case").query({caseId:0, gameId:67}).expect(200)
         })
     })
-    test("Delete a Case", async () => {
-        await runTest("Delete a Case", async () => {
-            await agent.delete("/api/eic/case").query({username: "bacon",caseId:0}).expect(200)
+    test("Mark case inactive", async () => {
+        await runTest("Mark case inactive", async () => {
+            await agent.delete("/api/eic/case").query({username: "bacon",caseId:0,gameId:67}).expect(200)
         })
     })
+    test("Cleanup test case", async () => {
+    await runTest("Cleanup test case", async () => {
+        const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
+        const result = await Case.deleteOne({ caseId: 0 });
+        expect(result.deletedCount).toBeLessThanOrEqual(1);
+    });
+});
 })
