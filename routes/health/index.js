@@ -23,7 +23,7 @@ const METRICS = {
  *         description: API is running fine
  */
 router.get('/', async (req, res) => {
-    return res.status(200).json({ "sucess": true })
+    return res.status(200).json({ "status": "ok" })
 });
 
 /**
