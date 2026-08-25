@@ -193,8 +193,22 @@ async function resetDB(settings, spreadsheetId,focusName) {
     const baseDateStr = res.data.values?.[0]?.[0];
     if (!baseDateStr) throw new Error("Date field is empty.");
 
-    const [month, day, year] = baseDateStr.split("/").map(s => parseInt(s, 10));
-    const baseDate = new Date(year, month - 1, day);
+    const parts = baseDateStr.split("/").map(s => parseInt(s.trim(), 10));
+    if (parts.length !== 3 || parts.some(p => Number.isNaN(p))) {
+        throw new Error("Invalid date format in settings: " + baseDateStr);
+    }
+    let day = parts[0], month = parts[1], year = parts[2];
+    // Prefer DD/MM/YYYY first
+    let baseDate = new Date(year, month - 1, day);
+    const isMatching = d => d && d.getFullYear() === year && d.getMonth() === (month - 1) && d.getDate() === day;
+    if (!isMatching(baseDate)) {
+        // Fall back to MM/DD/YYYY
+        month = parts[0]; day = parts[1]; year = parts[2];
+        baseDate = new Date(year, month - 1, day);
+        if (!isMatching(baseDate)) {
+            throw new Error("Invalid date after parsing as DD/MM/YYYY or MM/DD/YYYY: " + baseDateStr);
+        }
+    }
     const period = settings.quotaPeriod.trim();
     const num = parseInt(period);
     const unit = period.slice(-1);
