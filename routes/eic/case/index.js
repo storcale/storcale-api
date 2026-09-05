@@ -5,7 +5,7 @@ const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
 
 /**
  * @swagger
- * /eic/Case:
+ * /eic/case:
  *   post:
  *     summary: Log a case entry.
  *     security:
@@ -109,7 +109,7 @@ router.post('/', async (req, res) => {
 });
 /**
  * @swagger
- * /eic/Case:
+ * /eic/case:
  *   delete:
  *     summary: Mark case entries as inactive and remove a game from their active banned games list. Multiple query parameters are combined using AND logic.
  *     security:
@@ -197,7 +197,7 @@ router.delete('/', async (req, res) => {
 });
 /**
  * @swagger
- * /eic/Case:
+ * /eic/case:
  *   get:
  *     summary: Get case entries. Multiple query parameters are combined using AND logic.
  *     security:
@@ -300,7 +300,7 @@ router.get('/', async (req, res) => {
 });
 /**
  * @swagger
- * /eic/Case:
+ * /eic/case:
  *   put:
  *     summary: Record that one or more cases have been banned in a game.
  *     security:
@@ -391,7 +391,7 @@ router.put('/', async (req, res) => {
 
 /**
  * @swagger
- * /eic/Case:
+ * /eic/case:
  *   patch:
  *     summary: Remove a game ban log from one or more case entries. Multiple query parameters are combined using AND logic.
  *     security:

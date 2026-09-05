@@ -6,6 +6,7 @@ const auth = new google.auth.GoogleAuth({
     keyFile: path.join(global.__basedir, 'envs/gsaKey.env.json'),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
+const Reset = require(path.join(global.__basedir, 'db/schemas/reset.js'));
 
 async function loadSettings(spreadsheetId) {
     const client = await auth.getClient();
@@ -181,7 +182,7 @@ async function getRosterData(settings, spreadsheetId) {
         return result;
     }, []);
 }
-async function resetDB(settings, spreadsheetId,focusName) {
+async function resetDB(settings, spreadsheetId, focusName) {
     const client = await auth.getClient();
     const sheets = google.sheets({ version: 'v4', auth: client });
     const range = `${settings.settingsSheetName}!${settings.dateField}`;
@@ -243,7 +244,7 @@ async function resetDB(settings, spreadsheetId,focusName) {
         },
     });
     console.log(focusName)
-    let output = "# [Database Reset](https://docs.google.com/spreadsheets/d/"+spreadsheetId+") for " + focusName + "\n\n";
+    let output = "# [Database Reset](https://docs.google.com/spreadsheets/d/" + spreadsheetId + ") for " + focusName + "\n\n";
     output += "**Users with incomplete quota:**\n";
     if (Array.isArray(users?.incomplete)) {
         users.incomplete.forEach(user => {
@@ -260,11 +261,21 @@ async function resetDB(settings, spreadsheetId,focusName) {
     } else {
         output += "N/A.\n";
     }
-    const logFile = path.join(global.__basedir, 'logs', `reset.log`);
     const strikeUpdates = usersChanged.map(u => `${u.username} (${u.beforeStrikes} -> ${u.afterStrikes})`).join(', ');
     const incompleteUsers = users.incomplete.map(u => u.username).join(', ');
-    const logLine = `[${new Date().toISOString()}] Reset performed on spreadsheet ID ${spreadsheetId} | Quota Period: ${expiryDate.toLocaleDateString('en-US')} -> ${today.toLocaleDateString('en-US')} | Incomplete: [${incompleteUsers || 'N/A'}] | Strikes Updated: [${strikeUpdates || 'N/A'}]`;
-    fs.appendFileSync(logFile, logLine + '\n');
+
+    try {
+        await Reset.create({
+            spreadsheetId,
+            periodStart: expiryDate.getTime(),
+            periodEnd: today.getTime(),
+            incompleteString: incompleteUsers || 'N/A',
+            strikesString: strikeUpdates || 'N/A',
+        });
+    } catch (err) {
+        console.error('Failed to save reset log to MongoDB:', err.message);
+    }
+
     return output;
 }
 

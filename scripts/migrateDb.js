@@ -1,14 +1,8 @@
-/**
- * One-time migration: reads the old file-based storage and writes it into MongoDB.
- * Safe to re-run — everything is upserted / de-duplicated by unique key.
- *
- * Usage (from repo root):
- *   node scripts/migrate.js
- */
 const path = require('path');
 const fs = require('fs');
 const basedir = path.join(__dirname, '..');
 global.__basedir = basedir;
+const Reset = require(path.join(basedir, 'db/schemas/reset.js'));
 
 try {
     require('dotenv').config({ path: path.join(basedir, 'envs', '.env') });
@@ -49,6 +43,56 @@ async function migrateApiKeys() {
         count++;
     }
     console.log(`[apiKeys] Migrated ${count} key(s).`);
+}
+async function migrateResets() {
+    const file = path.join(basedir, 'logs', 'reset.log');
+    if (!fs.existsSync(file)) return console.log('[resets] No reset.log found, skipping.');
+
+    const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
+    const lineRegex = /^\[(.*?)\] Reset performed on spreadsheet ID (\S+) \| Quota Period: (.*?) -> (.*?) \| Incomplete: \[(.*?)\] \| Strikes Updated: \[(.*?)\]$/;
+
+    function parseUsDate(str) {
+        const parts = String(str).trim().split('/').map(Number);
+        if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+        const [month, day, year] = parts;
+        const d = new Date(year, month - 1, day);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    let count = 0;
+    let skipped = 0;
+
+    for (const line of lines) {
+        const match = line.match(lineRegex);
+        if (!match) { skipped++; continue; }
+
+        const [, isoTimestamp, spreadsheetId, periodStartStr, periodEndStr, incompleteStr, strikesStr] = match;
+
+        const periodStartDate = parseUsDate(periodStartStr);
+        const periodEndDate = parseUsDate(periodEndStr);
+        if (!periodStartDate || !periodEndDate) { skipped++; continue; }
+
+        const periodStart = periodStartDate.getTime();
+        const periodEnd = periodEndDate.getTime();
+
+        const timestamp = new Date(isoTimestamp);
+
+        await Reset.findOneAndUpdate(
+            { spreadsheetId, periodStart, periodEnd },
+            {
+                spreadsheetId,
+                periodStart,
+                periodEnd,
+                incompleteString: incompleteStr || 'N/A',
+                strikesString: strikesStr || 'N/A',
+                timestamp: isNaN(timestamp.getTime()) ? new Date() : timestamp,
+            },
+            { upsert: true }
+        );
+        count++;
+    }
+
+    console.log(`[resets] Migrated ${count} reset entrie(s), skipped ${skipped} malformed line(s).`);
 }
 
 async function migrateWebhooks() {
@@ -194,11 +238,12 @@ async function migrateMemberCount() {
 (async () => {
     await connectDB();
     // await migrateApiKeys();
-    await migrateBannedIps();
+    // await migrateBannedIps();
     // await migrateSpreadsheets();
-    await migrateWebhooks();   
+    // await migrateWebhooks();   
     // await migrateMatches();
     // await migrateMemberCount();
+    await migrateResets();
     console.log('Migration complete.');
     await mongoose.disconnect();
     process.exit(0);
