@@ -324,6 +324,12 @@ router.get('/', async (req, res) => {
  *         schema:
  *           type: integer
  *         description: Game ID to add to the active banned games list.
+ *       - in: query
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Group ID of the game.
  *     responses:
  *       200:
  *         description: Case(s) updated successfully.
@@ -372,12 +378,13 @@ router.put('/', async (req, res) => {
     try {
         const caseId = req.query.caseId
         const gameId = req.query.gameId
-        if (!caseId || !gameId) { return res.status(400).json({ error: 'Missing parameters' }) }
+        const groupId = req.query.groupId
+        if (!caseId || !gameId || !groupId) { return res.status(400).json({ error: 'Missing parameters' }) }
         let result = {}
         if (Array.isArray(caseId)) {
-            result = await Case.updateMany({ caseId: { "$in": caseId } }, { $push: { activeBannedGames: gameId } });
+            result = await Case.updateMany({ caseId: { "$in": caseId } }, { $push: { activeBannedGames: [groupId, gameId] } });
         } else {
-            result = await Case.updateOne({ caseId: caseId }, { $push: { activeBannedGames: gameId } });
+            result = await Case.updateOne({ caseId: caseId }, { $push: { activeBannedGames: [groupId, gameId] } });
         }
         if (result.matchedCount === 0) {
             return res.status(404).json({ error: "Not found" });
@@ -417,6 +424,12 @@ router.put('/', async (req, res) => {
  *         schema:
  *           type: integer
  *         description: Game ID to remove from the active banned games list.
+ *       - in: query
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Group ID of the game.
  *     responses:
  *       200:
  *         description: Ban log removed successfully.
@@ -466,14 +479,18 @@ router.patch('/', async (req, res) => {
     const caseId = req.query.caseId;
     const username = req.query.username;
     const gameId = req.query.gameId
-    if (((caseId === undefined || caseId === null ) && !username) || !gameId ) {
+    const groupId = req.query.groupId
+    if (!gameId || !groupId) {
+        return res.status(400).json({ error: 'Missing parameters. Game ID and Group ID are required' });
+    }
+    if (((caseId === undefined || caseId === null ) && !username) || !gameId  ) {
         return res.status(400).json({ error: 'Missing parameters. Username is at least required' });
     }
     try {
         let filter = {};
         if (caseId) filter.caseId = caseId;
         if (username) filter.robloxUsername = username;
-        const result = await Case.updateMany(filter,{$pull: { activeBannedGames: gameId }});
+        const result = await Case.updateMany(filter,{$pull: { activeBannedGames: [groupId, gameId] }});
         if (result.matchedCount === 0) {
             return res.status(404).json({ error: "Case not found for this user." });
         }

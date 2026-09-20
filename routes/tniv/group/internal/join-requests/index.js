@@ -43,6 +43,43 @@ router.post('/accept', async (req, res) => {
 
 /**
  * @swagger
+ * /tniv/group/internal/join-requests/decline:
+ *   post:
+ *     summary: Decline a join request for a user in a specific group.
+ *     security:
+ *      - apiKey: []
+ *     tags:
+ *       - TNIV/Group/Internal
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Successfully declined join request
+ *       500:
+ *         description: Server error
+ */
+router.post('/decline', async (req, res) => {
+    try {
+        const { userId } = req.query || {};
+
+        if (!userId) {
+            return res.status(400).json({ error: 'Missing required parameters' });
+        }
+        const joinRequest = new JoinRequest(userId, process.env.TNIV_GROUP_ID);
+        await joinRequest.decline();
+
+        res.json({ message: `Join request for user ${userId} in group ${process.env.TNIV_GROUP_ID} declined.` });
+    } catch (err) {
+        res.status(500).json({ error: 'Error declining join request: ' + err.message });
+    }
+});
+
+/**
+ * @swagger
  * /tniv/group/internal/join-requests:
  *   get:
  *     summary: List current join requests

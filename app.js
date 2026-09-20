@@ -10,7 +10,7 @@ app.set('trust proxy', 1);
 
 try {
     const dotenv = require('dotenv');
-    dotenv.config({ path: path.join(__dirname, 'envs/.env') });
+    dotenv.config({ path: path.join(__dirname, 'envs/.env') , debug: env === 'development' || env === 'test' });
     console.log('dotenv loaded');
 } catch (error) {
     console.error('Error loading .env:', error);
@@ -239,6 +239,9 @@ async function init() {
 
         initialized = true;
         console.timeEnd('Initialized API');
+        if(process.env.NODE_ENV == "test"){
+            app.listen(9902)
+        }
         return app;
     })();
 

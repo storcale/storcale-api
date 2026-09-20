@@ -6,7 +6,7 @@ const caseSchema = new (require('mongoose')).Schema({
     robloxUsername: { type: String, required: true},
     robloxId: { type: Number, required: true},
     weaponMechanic: {type: String, required: true},
-    activeBannedGames: {type:Array, required: true},
+    activeBannedGames: { type: [Number], required: true}, // group, universe
     active: {type:Boolean,required: true}
 });
 
