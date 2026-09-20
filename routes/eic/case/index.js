@@ -259,7 +259,7 @@ router.delete('/', async (req, res) => {
  *       403:
  *         description: Invalid API key for resource.
  *       404:
- *         description: No matching cases found.
+ *         description: No matching cases found for this query.
  *         content:
  *           application/json:
  *             schema:
@@ -475,7 +475,7 @@ router.patch('/', async (req, res) => {
         if (username) filter.robloxUsername = username;
         const result = await Case.updateMany(filter,{$pull: { activeBannedGames: gameId }});
         if (result.matchedCount === 0) {
-            return res.status(404).json({ error: "Not found" });
+            return res.status(404).json({ error: "Case not found for this user." });
         }
         return res.status(200).json({
             body: "Removed ban log on that case for "+gameId
