@@ -2,7 +2,7 @@ const request = require("supertest"), app = require("../app"), fs = require("fs"
 const disconnectDb = require("../db/db.js").disconnectDB;
 const results = [];
 const logFilePath = path.join(__dirname, "../access.log");
-
+const axios = require("axios");
 
 function log(message) {
     const line = `[${new Date().toISOString()}] ${message}`;
@@ -93,7 +93,24 @@ describe("TNIV/group", () => {
             });
         });
     }, 30000);
-
+    describe("TNIV/group/internal", () => {
+        test("Check Roblox API-KEY", async () => {
+        await runTest("Check Roblox API-KEY", async () => {
+            const response = await axios.post("https://apis.roblox.com/api-keys/v1/introspect",{apiKey: process.env.ROBLOX_API_KEY})
+            expect(response.status).toBe(200);
+            expect(response.data).toHaveProperty("enabled", true);
+        }); 
+    }, 30000);
+    test("Get join requests", async () => {
+            await runTest("Get join requests", async () => {
+                const JoinRequest = require("../utils/group.js").JoinRequest;
+                const joinRequest = new JoinRequest();
+                const response = await joinRequest.getJoinRequests();
+                expect(response.status).toBe(200);
+                expect(response.data).toHaveProperty("groupJoinRequests");
+            });
+    });
+    });
 });
 
 describe("TNIV/DB", () => {
@@ -195,4 +212,5 @@ describe("EIC/Case", () => {
         expect(result.deletedCount).toBeLessThanOrEqual(1);
     });
 });
+    
 })
