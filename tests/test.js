@@ -214,7 +214,7 @@ describe("TNIV/group", () => {
     test("Add universe ban", async () => {
             await runTest("Add universe ban", async () => {
                 const Ban = require(path.join(global.__basedir, 'utils/group.js')).Ban;
-                const ban = new Ban(8185869115,6914554864, 35062755); // random kid
+                const ban = new Ban(8185869115,7170768797, 35062755); // random kid
                 const response = await ban.update(true, "Test reason", "Test private reason", 3600);
                 expect(response).toHaveProperty('gameJoinRestriction');
                 
@@ -223,7 +223,7 @@ describe("TNIV/group", () => {
     test("Get universe ban", async () => {
             await runTest("Get universe ban", async () => {
                 const Ban = require(path.join(global.__basedir, 'utils/group.js')).Ban;
-                const ban = new Ban(8185869115,6914554864, 35062755); // random kid
+                const ban = new Ban(8185869115,7170768797, 35062755); // random kid
                 const response = await ban.getBans(8185869115);
                 expect(response).toHaveProperty('gameJoinRestriction');
                 expect(response.gameJoinRestriction).toHaveProperty('active', true);
@@ -234,10 +234,10 @@ describe("TNIV/group", () => {
             await wait(60*1000);
             await runTest("Remove universe ban", async () => {
                 const Ban = require(path.join(global.__basedir, 'utils/group.js')).Ban;
-                const ban = new Ban(8185869115,6914554864, 35062755); // random kid
+                const ban = new Ban(8185869115,7170768797, 35062755); // random kid
                 const response = await ban.update(false,"Test Appeal");
 
-                expect(response).toHaveProperty('userRestrictions');
+                expect(response).toHaveProperty('gameJoinRestriction');
                 expect(response.gameJoinRestriction).toHaveProperty('active', false);
             });
     },65000);

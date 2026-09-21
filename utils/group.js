@@ -80,14 +80,16 @@ async function sendDeclinedWebhook(userId, groupId) {
     return response.data;
 }
 
-async function sendBanUpdateWebhook(userId, groupId, active, reason) {
+async function sendBanUpdateWebhook(userId, groupId, universeId, active, reason) {
     let target = process.env.NODE_ENV == 'production' ? process.env.ANTI_LOGS_CODE : process.env.OFFICE_CODE
     const embed = {
         title: "Ban updated",
-        description: `[${userId}](https://www.roblox.com/users/profile?userId=${userId}) has had his ban updated in group [${groupId}](https://www.roblox.com/groups/${groupId}) to ${active}.`,
+        description: `[${userId}](https://www.roblox.com/users/profile?userId=${userId}) has had his ban updated in game [${universeId}](https://www.roblox.com/games/${universeId}) to ${active}.`,
         color: active ? 0xff0000 : 0x00ff00,
         fields: [
             { name: 'User ID', value: String(userId), inline: true },
+            { name: 'Universe ID', value: String(universeId), inline: true },
+            { name: 'Group ID', value: String(groupId), inline: true },
             { name: 'Reason', value: String(reason), inline: true },
         ],
         footer: {
@@ -232,6 +234,19 @@ class Game extends Group{
             throw err;
         }
     }
+    async getUniverse(placeid){
+        // 
+        try {
+            const response = await axios.get(
+                `https://apis.roblox.com/universes/v1/places/${placeid}/universe   `,
+                { headers: { "x-api-key": process.env.ROBLOX_API_KEY } }
+            );
+            return response.data;
+        } catch (err) {
+            console.error('[getUniverse] Failed:', err?.response?.data || err.message);
+            throw err;
+        }
+    }
 }
 class Ban extends Game {
     userId = '';
@@ -277,13 +292,13 @@ class Ban extends Game {
             ? await logBan(this.userId, this.universeId, this.groupId) // ! LOG BAN NOT WORKING
             : await logunban(this.userId, this.universeId, this.groupId);
 
-        sendBanUpdateWebhook(this.userId, this.groupId, active, data.displayReason)
+        sendBanUpdateWebhook(this.userId, this.groupId, this.universeId, active, data.displayReason)
             .catch(e => console.error('[sendBanUpdateWebhook] Failed:', e?.response?.data || e?.message));
 
         return response.data;
     } catch (err) {
         console.error('[Update Ban] Failed:', err?.response?.data || err.message);
-        sendErrorWebhook(err?.response?.data || err.message, "Ban update to " + active, "EIC");
+        await sendErrorWebhook(err?.response?.data || err.message, "Ban update to " + active, "EIC");
         throw err;
     }
 }
