@@ -77,7 +77,7 @@ router.delete('/', async (req, res) => {
         res.status(500).json({ error: 'Error declining join request: ' + err.message });
     }
 });
-
+// TODO add join request schema
 /**
  * @swagger
  * /tniv/group/internal/join-requests:
@@ -92,6 +92,7 @@ router.delete('/', async (req, res) => {
  *         description: Successfully sent join requests
  *       500:
  *         description: Server error
+ * 
  */
 router.get('/', async (req, res) => {
     try {
@@ -103,7 +104,7 @@ router.get('/', async (req, res) => {
         res.status(500).json({ error: 'Error listing join requests: ' + err.message });
     }
 });
-
+// TODO add response schema/example
 /**
  * @swagger
  * /tniv/group/internal/join-requests:
@@ -122,9 +123,9 @@ router.get('/', async (req, res) => {
 router.patch('/', async (req, res) => {
     try {
         const joinRequest = new JoinRequest();
-        await joinRequest.processPending();
+        const text = await joinRequest.processPending();
 
-        res.status(200).json({ message: 'Join requests processed successfully.' });
+        res.status(200).json({ message: '**Join requests processed successfully.**\n\n' + text });
     } catch (err) {
         res.status(500).json({ error: 'Error processing join requests: ' + err.message });
     }
