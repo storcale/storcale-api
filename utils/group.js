@@ -339,6 +339,7 @@ class JoinRequest extends Group {
     }
     async processPending() {
         const pending = await this.getJoinRequests();
+        const text = ""
         for (const request of pending) {
             const userId = request.user.split("/").slice(1).join("/");;
             this.userId = userId;
@@ -347,14 +348,17 @@ class JoinRequest extends Group {
                 console.log(userId + result)
                 if (result.result === true) {
                     await this.accept(result.username);
+                    text += result.username + ": Accepted\n"
                 } else {
                     await this.decline(result.reasonText,result.username);
-
+                    text += result.username + ": Declined" + "\n"
                 }
+                return text
             } catch (err) {
                 console.error(`[processPending] Error processing user ${userId}:`, err?.response?.data || err.message);
                 sendErrorWebhook(err?.response?.data || err?.message, "Process Pending", "Pending Join Requests")
                 throw err
+                return "An error occurred."
             }
         }
     }

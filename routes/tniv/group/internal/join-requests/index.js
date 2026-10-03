@@ -122,9 +122,9 @@ router.get('/', async (req, res) => {
 router.patch('/', async (req, res) => {
     try {
         const joinRequest = new JoinRequest();
-        await joinRequest.processPending();
+        const text = await joinRequest.processPending();
 
-        res.status(200).json({ message: 'Join requests processed successfully.' });
+        res.status(200).json({ message: '**Join requests processed successfully.**\n\n' + text });
     } catch (err) {
         res.status(500).json({ error: 'Error processing join requests: ' + err.message });
     }
