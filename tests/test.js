@@ -213,10 +213,29 @@ describe("EIC Cleanup", () => {
         })
     })
     test("Cleanup test case", async () => {
-    await runTest("Cleanup test case", async () => {
-        const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
-        const result = await Case.deleteOne({ caseId: 0 });
-        expect(result.deletedCount).toBeLessThanOrEqual(1);
+        await runTest("Cleanup test case", async () => {
+            const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
+            const result = await Case.deleteOne({ caseId: 0 });
+            expect(result.deletedCount).toBeLessThanOrEqual(1);
+        });
     });
 });
+
+describe("External Case Registries", () => {
+    test("Get cases from registry", async () => {
+        await runTest("Get cases from registry", async () => {
+            const RegistryCase = require(path.join(global.__basedir, 'utils/registry.js'));
+            const caseInstance = new RegistryCase();
+            const cases = await caseInstance.getCases();
+            expect(Array.isArray(cases)).toBe(true);
+        });
+    });
+    test("Get a specific case from registry", async () => {
+        await runTest("Get cases from registry", async () => {
+            const RegistryCase = require(path.join(global.__basedir, 'utils/registry.js'));
+            const caseInstance = new RegistryCase("CW", "1478099365", false); // goggybo
+            const cases = await caseInstance.getCases();
+            expect(cases.usernames).toBe("goggybo");
+        });
+    });
 });
