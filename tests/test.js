@@ -2,6 +2,11 @@ const request = require("supertest"), app = require("../app"), fs = require("fs"
 const disconnectDb = require("../db/db.js").disconnectDB;
 const results = [];
 const logFilePath = path.join(__dirname, "../access.log");
+const axios = require("axios");
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 
 function log(message) {
@@ -74,27 +79,7 @@ describe("General", () => {
 
 });
 
-describe("TNIV/group", () => {
 
-    if (process.env.NODE_ENV !== "github") {
-        test("Past membercount", async () => {
-            await runTest("June 2026 membercount", async () => {
-                await agent.get("/api/tniv/group/membercount").query({ groupId: 3612873, year: 2026, month: 5 }).expect(200).expect(res => {
-                    if (res.body.memberCount !== 79888) throw new Error("Unexpected memberCount");
-                });
-            });
-        }, 30000);
-    }
-
-    test("Current membercount", async () => {
-        await runTest("Current membercount", async () => {
-            await agent.get("/api/tniv/group/membercount").query({ groupId: 3612873 }).expect(200).expect(res => {
-                if (typeof res.body.memberCount !== "number") throw new Error("Response does not contain memberCount");
-            });
-        });
-    }, 30000);
-
-});
 
 describe("TNIV/DB", () => {
 
@@ -175,17 +160,56 @@ describe("EIC/Case", () => {
     })
     test("Get a Case", async () => {
         await runTest("Get a Case", async () => {
-            await agent.get("/api/eic/case").query({username: "bacon",caseId:0}).expect(200)
+            await agent.get("/api/eic/case").query({username: "bacon", robloxId:8185869115,caseId:0}).expect(200)
         })
     })
     test("Log a ban", async () => {
         await runTest("Log a ban", async () => {
-            await agent.get("/api/eic/case").query({caseId:0, gameId:67}).expect(200)
+            await agent.get("/api/eic/case").query({caseId:0, robloxId:8185869115, gameId:67, groupId: 1}).expect(200)
         })
     })
+})
+
+describe("TNIV/group", () => {
+
+    if (process.env.NODE_ENV !== "github") {
+        test("Past membercount", async () => {
+            await runTest("June 2026 membercount", async () => {
+                await agent.get("/api/tniv/group/membercount").query({ groupId: 3612873, year: 2026, month: 5 }).expect(200).expect(res => {
+                    if (res.body.memberCount !== 79888) throw new Error("Unexpected memberCount");
+                });
+            });
+        }, 30000);
+    }
+
+    test("Current membercount", async () => {
+        await runTest("Current membercount", async () => {
+            await agent.get("/api/tniv/group/membercount").query({ groupId: 3612873 }).expect(200).expect(res => {
+                if (typeof res.body.memberCount !== "number") throw new Error("Response does not contain memberCount");
+            });
+        });
+    }, 30000);
+    describe("TNIV/group/internal", () => {
+        test("Check Roblox API-KEY", async () => {
+        await runTest("Check Roblox API-KEY", async () => {
+            const response = await axios.post("https://apis.roblox.com/api-keys/v1/introspect",{apiKey: process.env.ROBLOX_API_KEY})
+            expect(response.status).toBe(200);
+            expect(response.data).toHaveProperty("enabled", true);
+        }); 
+    }, 30000);
+    test("Get join requests", async () => {
+            await runTest("Get join requests", async () => {
+                const response = await agent.get("/api/tniv/group/internal/join-requests")
+                expect(response.status).toBe(200);
+            });
+    });
+    });
+});
+
+describe("EIC Cleanup", () => {
     test("Mark case inactive", async () => {
         await runTest("Mark case inactive", async () => {
-            await agent.delete("/api/eic/case").query({username: "bacon",caseId:0,gameId:67}).expect(200)
+            await agent.delete("/api/eic/case").query({username: "bacon", robloxId:8185869115, caseId:0, gameId:67, groupId: 1}).expect(200)
         })
     })
     test("Cleanup test case", async () => {
@@ -195,4 +219,4 @@ describe("EIC/Case", () => {
         expect(result.deletedCount).toBeLessThanOrEqual(1);
     });
 });
-})
+});
