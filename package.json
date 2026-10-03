@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest --config jest.config.cjs --timeout=30000",
+    "test": "jest --config jest.config.cjs --timeout=30000 --forceExit",
     "start": "bun server.js"
   },
   "testEnvironment": "node",

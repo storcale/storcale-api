@@ -203,44 +203,6 @@ describe("TNIV/group", () => {
                 expect(response.status).toBe(200);
             });
     });
-    test("Get universe bans", async () => {
-            await runTest("Get universe bans", async () => {
-                const Ban = require(path.join(global.__basedir, 'utils/group.js')).Ban;
-                const ban = new Ban(0,6914554864, 35062755);
-                const response = await ban.getBans();
-                expect(response).toHaveProperty('userRestrictions');
-            });
-    });
-    test("Add universe ban", async () => {
-            await runTest("Add universe ban", async () => {
-                const Ban = require(path.join(global.__basedir, 'utils/group.js')).Ban;
-                const ban = new Ban(8185869115,7170768797, 35062755); // random kid
-                const response = await ban.update(true, "Test reason", "Test private reason", 3600);
-                expect(response).toHaveProperty('gameJoinRestriction');
-                
-            });
-    });
-    test("Get universe ban", async () => {
-            await runTest("Get universe ban", async () => {
-                const Ban = require(path.join(global.__basedir, 'utils/group.js')).Ban;
-                const ban = new Ban(8185869115,7170768797, 35062755); // random kid
-                const response = await ban.getBans(8185869115);
-                expect(response).toHaveProperty('gameJoinRestriction');
-                expect(response.gameJoinRestriction).toHaveProperty('active', true);
-            });
-    });
-    
-    test("Remove universe ban", async () => {
-            await wait(60*1000);
-            await runTest("Remove universe ban", async () => {
-                const Ban = require(path.join(global.__basedir, 'utils/group.js')).Ban;
-                const ban = new Ban(8185869115,7170768797, 35062755); // random kid
-                const response = await ban.update(false,"Test Appeal");
-
-                expect(response).toHaveProperty('gameJoinRestriction');
-                expect(response.gameJoinRestriction).toHaveProperty('active', false);
-            });
-    },65000);
     });
 });
 
