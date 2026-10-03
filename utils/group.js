@@ -3,7 +3,7 @@ const axios = require("axios");
 // send webhook via api
 async function sendAcceptedWebhook(userId, groupId) {
     let target = process.env.pendingWebhookCode;
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV !== 'production') {
         target = process.env.OFFICE_CODE;
     }
 
@@ -42,7 +42,7 @@ async function sendAcceptedWebhook(userId, groupId) {
 }
 async function sendDeclinedWebhook(userId, groupId) {
     let target = process.env.pendingWebhookCode;
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV != 'production') {
         target = process.env.OFFICE_CODE;
     }
 
@@ -116,6 +116,43 @@ async function sendBanUpdateWebhook(userId, groupId, universeId, active, reason)
     });
 
     return response.data;
+}
+
+
+function sendErrorWebhook(errorMessage="",place="",area="") {
+    let target = process.env.NODE_ENV == 'production' ? ( area == "EIC"? process.env.ANTI_LOGS_CODE : process.env.pendingWebhookCode ) : process.env.OFFICE_CODE
+    const embed = {
+        title: `${area} Error`,
+        description: `An error occurred in ${area} ${place} : ${errorMessage.message}`,
+        color: 0xff0000,
+        footer: {
+            text: `The Vanguard Development Team `+process.env.NODE_ENV,
+        },
+        timestamp: new Date().toISOString(),
+    };
+
+    const payload = {
+        username: 'Storcale-API',
+        embeds: [embed],
+    };
+
+    const baseUrl = process.env.NODE_ENV === 'production'
+        ? 'https://storcale-api.omegadev.xyz'
+        : 'http://localhost:9902';
+    const url = `${baseUrl}/api/tniv/webhooks?target=${encodeURIComponent(target)}`;
+
+    axios.post(url, payload, { 
+        headers: {
+            'Content-Type': 'application/json',
+            'api-key': process.env.ADMIN_KEY || '',
+        },
+    }).catch(err => {
+    console.error('[sendErrorWebhook] Failed:', {
+        code: err.code,
+        message: err.message,
+        response: err?.response?.data,
+    });
+});
 }
 
 /**
