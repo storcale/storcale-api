@@ -305,9 +305,6 @@ class JoinRequest extends Group {
                 {},
                 { headers: { "x-api-key": process.env.ROBLOX_API_KEY } }
             );
-            const user = new User(this.userId);
-            const userInfo = await user.getInfo();
-            const username = userInfo.name;
             sendAcceptedWebhook(this.userId, this.groupId, username)
                 .catch(e =>
                     console.error('[sendAcceptedWebhook] Failed:', e?.response?.data || e?.message)
@@ -329,8 +326,6 @@ class JoinRequest extends Group {
                 {},
                 { headers: { "x-api-key": process.env.ROBLOX_API_KEY } }
             );
-            
-            let response = {data:"im gone"}
             sendDeclinedWebhook(this.userId, this.groupId, reasonText, username)
                 .catch(e =>
                     console.error('[sendDeclinedWebhook] Failed:', e?.response?.data || e?.message)

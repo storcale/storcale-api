@@ -235,7 +235,6 @@ describe("External Case Registries", () => {
             const RegistryCase = require(path.join(global.__basedir, 'utils/registry.js'));
             const caseInstance = new RegistryCase("CW", "1478099365", false); // goggybo
             const cases = await caseInstance.getCases();
-            console.log(cases)
             expect(cases.usernames).toBe("goggybo");
         });
     });
