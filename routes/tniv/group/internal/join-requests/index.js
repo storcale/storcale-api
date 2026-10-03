@@ -3,10 +3,10 @@ const express = require('express');
 const path = require('path');
 const router = express.Router();
 const JoinRequest = require(path.join(global.__basedir, 'utils/group.js')).JoinRequest;
-
+const Group = require(path.join(global.__basedir, 'utils/group.js')).Group;
 /**
  * @swagger
- * /tniv/group/internal/join-requests/accept:
+ * /tniv/group/internal/join-requests:
  *   post:
  *     summary: Accept a join request for a user in a specific group.
  *     security:
@@ -25,7 +25,7 @@ const JoinRequest = require(path.join(global.__basedir, 'utils/group.js')).JoinR
  *       500:
  *         description: Server error
  */
-router.post('/accept', async (req, res) => {
+router.post('/', async (req, res) => {
     try {
         const { userId } = req.query || {};
 
@@ -43,8 +43,8 @@ router.post('/accept', async (req, res) => {
 
 /**
  * @swagger
- * /tniv/group/internal/join-requests/decline:
- *   post:
+ * /tniv/group/internal/join-requests:
+ *   delete:
  *     summary: Decline a join request for a user in a specific group.
  *     security:
  *      - apiKey: []
@@ -62,7 +62,7 @@ router.post('/accept', async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.post('/decline', async (req, res) => {
+router.delete('/', async (req, res) => {
     try {
         const { userId } = req.query || {};
 
@@ -101,6 +101,32 @@ router.get('/', async (req, res) => {
         res.json({ requests: requests });
     } catch (err) {
         res.status(500).json({ error: 'Error listing join requests: ' + err.message });
+    }
+});
+
+/**
+ * @swagger
+ * /tniv/group/internal/join-requests:
+ *   patch:
+ *     summary: Process current join requests. Verifications are Account Age > 100 days, not in EIC registry, not in External Registries
+ *     security:
+ *      - apiKey: []
+ *     tags:
+ *       - TNIV/Group/Internal
+ *     responses:
+ *       200:
+ *         description: Successfully processed
+ *       500:
+ *         description: Server error
+ */
+router.patch('/', async (req, res) => {
+    try {
+        const joinRequest = new JoinRequest();
+        await joinRequest.processPending();
+
+        res.status(200).json({ message: 'Join requests processed successfully.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Error processing join requests: ' + err.message });
     }
 });
 
