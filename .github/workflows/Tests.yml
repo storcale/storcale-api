@@ -70,6 +70,8 @@ jobs:
           TREASURY_ID: ${{ vars.TREASURY_ID }}
           TNIV_GROUP_ID: ${{ vars.TNIV_GROUP_ID }}
           OFFICE_CODE: ${{ secrets.OFFICE_CODE }}
+          CL_API_KEY: ${{ secrets.CL_API_KEY }}
+          CL_CLAN_ID: ${{ secrets.CL_CLAN_ID }}
           NODE_OPTIONS: --experimental-vm-modules
           PUBLIC_DIRS: "admin-ui/login,login,api-docs,health"
         run: |

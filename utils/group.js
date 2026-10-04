@@ -1,7 +1,8 @@
 const axios = require("axios");
 const path = require("path");
 const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
- const RegistryCase = require(path.join(global.__basedir, 'utils/registry.js'));
+const RegistryCase = require(path.join(global.__basedir, 'utils/registry.js'));
+const getBlacklist = require(path.join(global.__basedir, 'utils/clanLabs.js'));
 // send webhook via api
 async function sendAcceptedWebhook(userId, groupId, username) {
     let target = process.env.pendingWebhookCode;
@@ -243,7 +244,7 @@ class Game extends Group {
         // 
         try {
             const response = await axios.get(
-                `https://apis.roblox.com/universes/v1/places/${placeid}/universe   `,
+                `https://apis.roblox.com/universes/v1/places/${placeid}/universe`,
                 { headers: { "x-api-key": process.env.TREASURY_API_KEY } }
             );
             return response.data;
@@ -276,7 +277,12 @@ class User {
 }
 
 class JoinRequest extends Group {
-    userId = '';
+    /**
+     * Creates an instance of JoinRequest.
+     * @param {string} [userId='']
+     * @param {integer} [groupId=process.env.TNIV_GROUP_ID]
+     * @memberof JoinRequest
+     */
     constructor(userId = '', groupId = process.env.TNIV_GROUP_ID) {
         super(groupId);
         this.userId = userId;
@@ -319,7 +325,7 @@ class JoinRequest extends Group {
         }
     }
 
-    async decline(reasonText,username) {
+    async decline(reasonText, username) {
         try {
             const response = await axios.post(
                 `https://apis.roblox.com/cloud/v2/groups/${this.groupId}/join-requests/${this.userId}:decline`,
@@ -339,28 +345,29 @@ class JoinRequest extends Group {
     }
     async processPending() {
         const pending = await this.getJoinRequests();
-        const text = ""
+        let text = "";
+        if (!pending || pending.length === 0) {
+            return "No pending join requests found.";
+        }
         for (const request of pending) {
-            const userId = request.user.split("/").slice(1).join("/");;
+            const userId = request.user.split("/").slice(1).join("/");
             this.userId = userId;
             try {
                 const result = await processUser(userId);
-                console.log(userId + result)
                 if (result.result === true) {
                     await this.accept(result.username);
-                    text += result.username + ": Accepted\n"
+                    text += result.username + ": Accepted\n";
                 } else {
-                    await this.decline(result.reasonText,result.username);
-                    text += result.username + ": Declined" + "\n"
+                    await this.decline(result.reason, result.username);
+                    text += result.username + ": Declined\n";
                 }
-                return text
             } catch (err) {
                 console.error(`[processPending] Error processing user ${userId}:`, err?.response?.data || err.message);
-                sendErrorWebhook(err?.response?.data || err?.message, "Process Pending", "Pending Join Requests")
-                throw err
-                return "An error occurred."
+                sendErrorWebhook(err, "Process Pending", "Pending Join Requests");
+                text += `${userId}: Error (${err.message})\n`;
             }
         }
+        return text;
     }
 }
 
@@ -391,7 +398,12 @@ async function processUser(id) {
             return { result: false, reason: `User ${cases[0].usernames} has active cases in registries: ${cases.map(c => c.source).join(", ")}. \n Category: ${cases[0].category} | Type: ${cases[0].type} | Strike: ${cases[0].strike} \n Notes: ${cases[0].notes} EndDate: ${cases[0].end_date}`, username };
         }
 
-        // TODO CL BLs
+        // CL BLs
+
+        const blacklist = await getBlacklist("User", id);
+        if (blacklist) {
+            return { result: false, reason: `User is blacklisted in ClanLabs: ${blacklist.name} (${blacklist.reason})`, username };
+        }
 
         // TODO rotector etc
 

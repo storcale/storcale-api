@@ -6,10 +6,20 @@ let url = "https://api.keystone-swords.com/api/cases"
 
 // TODO cache
 
-
+/**
+ *
+ *
+ * @class RegistryCase
+ */
 class RegistryCase {
     active = true
-    registry = false
+    /**
+     * Creates an instance of RegistryCase.
+     * @param {string} registry
+     * @param {string} userId
+     * @param {boolean} active
+     * @memberof RegistryCase
+     */
     constructor(registry, userId, active) {
         this.registry = registry;
         this.userId = userId;

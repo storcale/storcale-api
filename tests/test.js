@@ -239,3 +239,19 @@ describe("External Case Registries", () => {
         });
     });
 });
+describe("ClanLabs", () => {
+    test("Get blacklist for user", async () => {
+        await runTest("Get blacklist for user", async () => {
+            const getBlacklist = require(path.join(global.__basedir, 'utils/clanLabs.js'));
+            const result = await getBlacklist("User", "1478099365"); // goggybo
+            expect(result.name).toBe("goggybo");
+        });
+    });
+    test("Get blacklist for group", async () => {
+        await runTest("Get blacklist for group", async () => {
+            const getBlacklist = require(path.join(global.__basedir, 'utils/clanLabs.js'));
+            const result = await getBlacklist("Group", "35736046"); // Valax
+            expect(result.name).toBe("Valax ’");
+        });
+    });
+});
