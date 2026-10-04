@@ -32,7 +32,7 @@ async function connectDB() {
         isConnected = false;
         console.warn('MongoDB disconnected.');
     });
-    if (process.env.NODE_ENV === "development" || process.env.NODE_EJV === "test") {
+    if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
         mongoose.set("debug", true);
     }
     return mongoose.connection;
