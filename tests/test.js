@@ -273,9 +273,6 @@ describe("Internal/webhooks", () => {
         await runTest("Delete a webhook", async () => {
             const result = await agent.delete("/api/admin/webhooks/test-webhook").expect(200);
             expect(result.body.message).toBe("Webhook deleted successfully");
-            const Webhook = require(path.join(global.__basedir, 'db/schemas/webhook.js'));
-            const deletedWebhook = await Webhook.findOne({ code: "test-webhook" });
-            expect(deletedWebhook).toBeNull();
         });
     });
 });

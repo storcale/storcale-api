@@ -11,19 +11,26 @@ const router = express.Router();
  *      - apiKey: []
  *     tags:
  *       - Admin/Webhooks
- *     parameters:
- *       - in: body
- *         name: webhook
- *         required: true
- *         schema:
- *           type: object
- *           properties:
- *             name:
- *               type: string
- *             code:
- *               type: string
- *             url:
- *               type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - code
+ *               - url
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Short description of the webhook target.
+ *               code:
+ *                 type: string
+ *                 description: Unique identifier for the webhook.
+ *               url:
+ *                 type: string
+ *                 description: URL to which the webhook should send requests.
  *     responses:
  *       200:
  *         description: Successfully created webhook
