@@ -5,7 +5,7 @@ const logFilePath = path.join(__dirname, "../access.log");
 const axios = require("axios");
 
 function wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 
@@ -252,6 +252,27 @@ describe("ClanLabs", () => {
             const getBlacklist = require(path.join(global.__basedir, 'utils/clanLabs.js'));
             const result = await getBlacklist("Group", "35736046"); // Valax
             expect(result.name).toBe("Valax ’");
+        });
+    });
+});
+
+describe("Internal/webhooks", () => {
+    test("Create a webhook", async () => {
+        await runTest("Create a webhook", async () => {
+            const newWebhook = await agent.post("/api/admin/webhooks").send({
+                name: "Test Webhook",
+                code: "test-webhook",
+                url: "https://example.com/webhook"
+            }).expect(201).expect(res => {
+                if (!res.body.webhook || res.body.webhook.code !== "test-webhook") throw new Error("Webhook not created correctly");
+            });
+            expect(newWebhook.body.webhook.code).toBe("test-webhook");
+        });
+    });
+    test("Delete a webhook", async () => {
+        await runTest("Delete a webhook", async () => {
+            const result = await agent.delete("/api/admin/webhooks/test-webhook").expect(200);
+            expect(result.body.message).toBe("Webhook deleted successfully");
         });
     });
 });
