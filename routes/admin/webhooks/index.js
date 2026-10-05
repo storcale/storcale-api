@@ -63,7 +63,7 @@ router.post('/', async (req, res) => {
 
 /**
  * @swagger
- * /admin/webhooks/{code}:
+ * /admin/webhooks:
  *   delete:
  *     summary: Delete a webhook by its code.
  *     security:
@@ -71,7 +71,7 @@ router.post('/', async (req, res) => {
  *     tags:
  *       - Admin/Webhooks
  *     parameters:
- *       - in: path
+ *       - in: query
  *         name: code
  *         required: true
  *         schema:
@@ -91,9 +91,9 @@ router.post('/', async (req, res) => {
  *                 error:
  *                   type: string
  */
-router.delete('/:code', async (req, res) => {
+router.delete('/', async (req, res) => {
     try {
-        const { code } = req.params || {};
+        const { code } = req.query || {};
 
         if (!code) {
             return res.status(400).json({ error: 'Missing required parameters' });
