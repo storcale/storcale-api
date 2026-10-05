@@ -261,18 +261,20 @@ describe("Internal/webhooks", () => {
         await runTest("Create a webhook", async () => {
             const newWebhook = await agent.post("/api/admin/webhooks").send({
                 name: "Test Webhook",
-                code: "test-webhook",
+                code: "testWebhook",
                 url: "https://example.com/webhook"
             }).expect(201).expect(res => {
-                if (!res.body.webhook || res.body.webhook.code !== "test-webhook") throw new Error("Webhook not created correctly");
+                if (!res.body.webhook || res.body.webhook.code !== "testWebhook") throw new Error("Webhook not created correctly");
             });
-            expect(newWebhook.body.webhook.code).toBe("test-webhook");
         });
     });
     test("Delete a webhook", async () => {
         await runTest("Delete a webhook", async () => {
-            const result = await agent.delete("/api/admin/webhooks/test-webhook").expect(200);
+            const result = await agent.delete("/api/admin/webhooks").query({ code: "testWebhook" }).expect(200);
             expect(result.body.message).toBe("Webhook deleted successfully");
+            const Webhook = require(path.join(global.__basedir, 'db/schemas/webhook.js'));
+            const deletedWebhook = await Webhook.findOneAndDelete({ code: "testWebhook" });
+            expect(deletedWebhook).toBeNull();
         });
     });
 });

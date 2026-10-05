@@ -49,7 +49,6 @@ const router = express.Router();
 router.post('/', async (req, res) => {
     try {
         const { name, code, url } = req.body || {};
-
         if (!name || !code || !url) {
             return res.status(400).json({ error: 'Missing required parameters' });
         }
