@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
-
+const { CaseNotifier } = require(path.join(global.__basedir, 'routes/eic/notifications.js'));
 /**
  * @swagger
  * /eic/case:
@@ -101,6 +101,12 @@ router.post('/', async (req, res) => {
             activeBannedGames: [],
             active: caseData.active || true
         });
+        const notifier = new CaseNotifier({
+            id: caseData.caseId,
+            robloxUsername: caseData.robloxUsername,
+            weaponMechanic: caseData.weaponMechanic
+        });
+        await notifier.sendNewWebhook(caseData.active || true);
         return res.status(200).json({ body: 'Created!', caseId: caseData.caseId });
     } catch (err) {
         if (err.code === 11000) {
@@ -190,6 +196,12 @@ router.delete('/', async (req, res) => {
         if (result.matchedCount === 0) {
             return res.status(404).json({ error: "Not found" });
         }
+        const notifier = new CaseNotifier({
+            id: caseId || "N/A",
+            robloxUsername: username || "N/A",
+            weaponMechanic: "N/A"
+        });
+        await notifier.sendNewWebhook(false);
         return res.status(200).json({
             body: "Made inactive entries matching the query."
         });
