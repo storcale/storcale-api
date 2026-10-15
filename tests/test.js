@@ -154,7 +154,7 @@ describe("TNIV/Sheets", () => {
 describe("EIC/Case", () => {
     test("Add a Case", async () => {
         await runTest("Add a Case", async () => {
-            const jason = JSON.parse('{"caseId": 0,"robloxUsername": "bacon", "robloxId": 1,"weaponMechanic": "lightsabers"}')
+            const jason = JSON.parse('{"caseId": 0,"robloxUsername": "bacon", "robloxId": 1,"weaponMechanic": "lightsabers","active": true}');
             await agent.post("/api/eic/case").send(jason).expect(200)
         })
     })

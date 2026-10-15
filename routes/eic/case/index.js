@@ -36,6 +36,9 @@ const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
  *               weaponMechanic:
  *                 type: string
  *                 description: Weapon mechanic associated with the case.
+ *               active:
+ *                type: boolean
+ *                description: Whether the case is active or not.
  *     responses:
  *       200:
  *         description: Case entry logged successfully.
@@ -96,7 +99,7 @@ router.post('/', async (req, res) => {
             robloxId: caseData.robloxId || 0,
             weaponMechanic: caseData.weaponMechanic,
             activeBannedGames: [],
-            active: true
+            active: caseData.active || true
         });
         return res.status(200).json({ body: 'Created!', caseId: caseData.caseId });
     } catch (err) {
