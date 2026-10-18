@@ -2,23 +2,24 @@
 // Get Cases from SCC, CW, Keystone, etc registries via keystone api
 
 let axios = require("axios");
-let url = "https://api.keystone-swords.com/api/cases"
 
-// TODO cache
 
+
+// Keystone
+let kUrl = "https://api.keystone-swords.com/api/cases"
 /**
  *
  *
- * @class RegistryCase
+ * @class KRegistryCase
  */
-class RegistryCase {
+class KRegistryCase {
     active = true
     /**
-     * Creates an instance of RegistryCase.
+     * Creates an instance of KRegistryCase.
      * @param {string} registry
      * @param {string} userId
      * @param {boolean} active
-     * @memberof RegistryCase
+     * @memberof KRegistryCase
      */
     constructor(registry, userId, active) {
         this.registry = registry;
@@ -26,7 +27,7 @@ class RegistryCase {
         this.active = (registry === "CW" ? (active ? ":green_circle: active" : ":orange_circle: archived") : (active ? "active" : "inactive"))
     }
     async getCases() {
-        const response = await axios.get(url);
+        const response = await axios.get(kUrl);
         let cases = Object.values(response.data)[0];
 
         if (!cases.length) {
@@ -62,4 +63,5 @@ class RegistryCase {
         return dgnCases;
     }
 }
-module.exports = RegistryCase;
+
+module.exports = KRegistryCase

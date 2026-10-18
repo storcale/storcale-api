@@ -13,6 +13,7 @@
   "license": "ISC",
   "packageManager": "bun",
   "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "Math": "0.0.1-security",
     "axios": "^1.11.0",
     "babel-cli": "^6.26.0",

@@ -278,3 +278,12 @@ describe("Internal/webhooks", () => {
         });
     });
 });
+
+describe("EIC/Badges",() => {
+    test("Get badges for user",async () => {
+        const badges = await agent.get("/api/eic/badges").query({userId:1478099365}).expect(200).expect(res => {
+                if (!res.body[0] || res.body[0].badges[0].name !== "Bumble Bee") throw new Error("Badges not fetched sucessfully");
+            });
+        
+    })
+} )

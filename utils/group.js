@@ -1,7 +1,7 @@
 const axios = require("axios");
 const path = require("path");
 const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
-const RegistryCase = require(path.join(global.__basedir, 'utils/registry.js'));
+const KRegistryCase = require(path.join(global.__basedir, 'utils/registry.js'));
 const getBlacklist = require(path.join(global.__basedir, 'utils/clanLabs.js'));
 // send webhook via api
 async function sendAcceptedWebhook(userId, groupId, username) {
@@ -392,7 +392,8 @@ async function processUser(id) {
         }
 
         // registries
-        const registry = new RegistryCase(null, id, true);
+        // Keystone
+        const registry = new KRegistryCase(null, id, true);
         const cases = await registry.getCases();
         if (cases && cases.length > 0) {
             return { result: false, reason: `User ${cases[0].usernames} has active cases in registries: ${cases.map(c => c.source).join(", ")}. \n Category: ${cases[0].category} | Type: ${cases[0].type} | Strike: ${cases[0].strike} \n Notes: ${cases[0].notes} EndDate: ${cases[0].end_date}`, username };
