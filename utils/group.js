@@ -2,7 +2,8 @@ const axios = require("axios");
 const path = require("path");
 const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
 const RegistryCase = require(path.join(global.__basedir, 'utils/registry.js'));
-const getBlacklist = require(path.join(global.__basedir, 'utils/clanLabs.js'));
+const {getBlacklist} = require(path.join(global.__basedir, 'utils/clanLabs.js'));
+const {getGroupBlacklistsForUser} = require(path.join(global.__basedir, 'utils/clanLabs.js'))
 // send webhook via api
 async function sendAcceptedWebhook(userId, groupId, username) {
     let target = process.env.pendingWebhookCode;
@@ -274,6 +275,19 @@ class User {
             throw err;
         }
     }
+    async getGroups(){
+        const url = `https://groups.roblox.com/v1/users/${this.userId}/groups/roles?includeLocked=false&includeNotificationPreferences=false`
+        try {
+            const response = await axios.get(url);
+            const groups = response.data.data.map(o => {
+                return o.group.id;
+            });
+            return groups
+        } catch (err) {
+            console.error('[getGroups] Failed:', err?.response?.data || err.message);
+            throw err;
+        }
+    }
 }
 
 class JoinRequest extends Group {
@@ -373,48 +387,67 @@ class JoinRequest extends Group {
 
 async function processUser(id) {
     try {
+        let data = []
+        let pass = 0
         let user = new User(id);
         let userInfo = await user.getInfo();
         let username = userInfo.name;
-        let accountAge = new Date(userInfo.created).getTime();
+        let accountAge = new Date(userInfo.createTime).getTime();
+
+        console.time("ProcessUser")
         let currentTime = new Date().getTime();
         let ageInDays = (currentTime - accountAge) / (1000 * 60 * 60 * 24);
-
+        
         // Age check
-        if (ageInDays < 100) {
-            return { result: false, reason: `Account is too new (${ageInDays} days)`, username };
+        if(ageInDays < 100){
+            pass +=1
         }
-
+        data.push({"AccountAge": { result: ageInDays < 100, reason: ageInDays < 100 ? `Account is too new (${ageInDays} days)` : '', age:ageInDays, username }});
+        console.timeLog("ProcessUser","age")
         // EIC
         const caseData = await Case.findOne({ robloxId: id, status: 'active' });
-        if (caseData) {
-            return { result: false, reason: `User has an active case (${caseData.reason})`, username };
+        if(caseData){
+            pass +=1
         }
-
+        data.push({"EIC":{result: caseData ? true : false, reason: caseData? `User has an active [${caseData.active}] case in ${caseData.weaponMechanic} ` : '',username}})
+        console.timeLog("ProcessUser","eic")
         // registries
-        const registry = new RegistryCase(null, id, true);
+        const registry = new RegistryCase(null, `${id}`, true); // ! Some cases like CW dont show up
         const cases = await registry.getCases();
-        if (cases && cases.length > 0) {
-            return { result: false, reason: `User ${cases[0].usernames} has active cases in registries: ${cases.map(c => c.source).join(", ")}. \n Category: ${cases[0].category} | Type: ${cases[0].type} | Strike: ${cases[0].strike} \n Notes: ${cases[0].notes} EndDate: ${cases[0].end_date}`, username };
+        console.log(cases)
+        if (cases && cases[0]) { // ! doesnt flag for some reason
+            pass += 1    
         }
+        data.push({"Registries":{ result: (cases && cases[0])=== true , reason: (cases && cases[0]) ?`User ${cases[0].usernames} has active cases in registries: ${cases.map(c => c.source).join(", ")}. \n Category: ${cases[0].category} | Type: ${cases[0].type} | Strike: ${cases[0].strike} \n Notes: ${cases[0].notes} EndDate: ${cases[0].end_date}`: '', username }});
+        console.timeLog("ProcessUser","registries")
 
         // CL BLs
 
         const blacklist = await getBlacklist("User", id);
         if (blacklist) {
-            return { result: false, reason: `User is blacklisted in ClanLabs: ${blacklist.name} (${blacklist.reason})`, username };
+            pass +=1
         }
-
-        // TODO rotector etc
-
-        return { result: true, reason: "Passed all checks.", username };
+        data.push({"User Blacklist":{ result: blacklist ? true : false, reason: blacklist ? `User is blacklisted on ClanLabs: ${blacklist.name} (${blacklist.description})` : '', username }});
+        console.timeLog("ProcessUser","blacklist")
+        const groupBlacklists = await getGroupBlacklistsForUser(id);
+        if (groupBlacklists) {
+            pass +=1
+        }
+        data.push({"Group Blacklist":{ result: groupBlacklists ? true : false, reason: groupBlacklists ? `User is blacklisted in ClanLabs for being in ${groupBlacklists.length} group(s):  ${ groupBlacklists.map(groupBlacklist =>  groupBlacklist.name + ': ' + groupBlacklist.description + '\n')})` : '', username, groupBlacklists }});
+        console.timeLog("ProcessUser","group blacklist")
+        console.log(data)
+        console.timeEnd("ProcessUser")
+        // TODO rotector spidereye etc
+        return { result: pass === 0,  reason: pass ===0 ? "Passed all checks." : `Failed ${pass} checks.`, checks:data, username };
     } catch (err) {
         console.error('[processPending] Failed:', err?.response?.data || err.message);
-        throw err;
-        return { result: false, reason: 'Error processing pending request ' + err.message, username: null };
+        throw err
+        //return { error: 'Error processing pending request ' + err.message, username };
     }
 }
 module.exports = {
     Group,
-    JoinRequest
+    JoinRequest,
+    processUser,
+    User
 };

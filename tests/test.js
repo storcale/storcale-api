@@ -233,7 +233,7 @@ describe("External Case Registries", () => {
     test("Get a specific case from registry", async () => {
         await runTest("Get cases from registry", async () => {
             const RegistryCase = require(path.join(global.__basedir, 'utils/registry.js'));
-            const caseInstance = new RegistryCase("CW", "1478099365", false); // goggybo
+            const caseInstance = new RegistryCase(null, "1478099365", true); // goggybo
             const cases = await caseInstance.getCases();
             expect(cases.usernames).toBe("goggybo");
         });
@@ -242,18 +242,40 @@ describe("External Case Registries", () => {
 describe("ClanLabs", () => {
     test("Get blacklist for user", async () => {
         await runTest("Get blacklist for user", async () => {
-            const getBlacklist = require(path.join(global.__basedir, 'utils/clanLabs.js'));
+            const {getBlacklist} = require(path.join(global.__basedir, 'utils/clanLabs.js'));
             const result = await getBlacklist("User", "1478099365"); // goggybo
             expect(result.name).toBe("goggybo");
         });
     });
     test("Get blacklist for group", async () => {
         await runTest("Get blacklist for group", async () => {
-            const getBlacklist = require(path.join(global.__basedir, 'utils/clanLabs.js'));
+            const {getBlacklist} = require(path.join(global.__basedir, 'utils/clanLabs.js'));
             const result = await getBlacklist("Group", "35736046"); // Valax
             expect(result.name).toBe("Valax ’");
         });
     });
+});
+
+describe("Join Requests", () => {
+    test("Process and deny request", async () => {
+        await runTest("Process and deny request", async () => {
+            const {processUser} = require(path.join(global.__basedir, 'utils/group.js'));
+            //const result = await processUser(4114861546);  // valax guy
+            const result = await processUser(1478099365); // goggybo 
+            expect(result)
+            expect(result.result).toBe(false);
+            
+        });
+    },30000);
+    test("Process and accept request", async () => {
+        await runTest("Process and accegetGroupBlacklistForUsergetGroupBlacklistForUserpt request", async () => {
+            const {processUser} = require(path.join(global.__basedir, 'utils/group.js'));
+            const result = await processUser(754278380); // me 
+            expect(result)
+            expect(result.result).toBe(true);
+            
+        });
+    },30000);
 });
 
 describe("Internal/webhooks", () => {
