@@ -1,6 +1,6 @@
 
 const axios = require('axios');
-
+const path = require("path")
 /**
  * @param {"User"|"Group"} type
  * @param {string} id
@@ -18,12 +18,31 @@ async function getBlacklist(type, id) {
             // don't throw on 404/204
             validateStatus: (status) => (status >= 200 && status < 300) || status === 404,
         }
-    );
-
+    )
     if (response.status === 404 || response.status === 204) return false;
-
     return response.data?.data ?? false;
 }
 
-module.exports = getBlacklist;
+async function getGroupBlacklistsForUser(id) {
+    try {
+        const { User } = require(path.join(global.__basedir, 'utils/group.js'));
+        const user = new User(id)
+
+        const groups = await user.getGroups()
+        const blacklists = []
+        for (const groupId of groups) {
+            let blacklist = await getBlacklist("Group", groupId)
+            if (blacklist) {
+                blacklists.push(blacklist)
+            }
+        }
+        if (blacklists.length > 0) { return blacklists }
+        return false
+    } catch (e) {
+        console.log("[getGroupBlacklistsForUser] An Error occurred: " + e)
+        throw e
+    }
+}
+
+module.exports = { getBlacklist, getGroupBlacklistsForUser }
 
