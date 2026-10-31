@@ -160,12 +160,12 @@ describe("EIC/Case", () => {
     })
     test("Get a Case", async () => {
         await runTest("Get a Case", async () => {
-            await agent.get("/api/eic/case").query({username: "bacon", robloxId:8185869115,caseId:0}).expect(200)
+            await agent.get("/api/eic/case").query({ username: "bacon", robloxId: 8185869115, caseId: 0 }).expect(200)
         })
     })
     test("Log a ban", async () => {
         await runTest("Log a ban", async () => {
-            await agent.get("/api/eic/case").query({caseId:0, robloxId:8185869115, gameId:67, groupId: 1}).expect(200)
+            await agent.get("/api/eic/case").query({ caseId: 0, robloxId: 8185869115, gameId: 67, groupId: 1 }).expect(200)
         })
     })
 })
@@ -191,25 +191,25 @@ describe("TNIV/group", () => {
     }, 30000);
     describe("TNIV/group/internal", () => {
         test("Check Roblox API-KEY", async () => {
-        await runTest("Check Roblox API-KEY", async () => {
-            const response = await axios.post("https://apis.roblox.com/api-keys/v1/introspect",{apiKey: process.env.ROBLOX_API_KEY})
-            expect(response.status).toBe(200);
-            expect(response.data).toHaveProperty("enabled", true);
-        }); 
-    }, 30000);
-    test("Get join requests", async () => {
+            await runTest("Check Roblox API-KEY", async () => {
+                const response = await axios.post("https://apis.roblox.com/api-keys/v1/introspect", { apiKey: process.env.ROBLOX_API_KEY })
+                expect(response.status).toBe(200);
+                expect(response.data).toHaveProperty("enabled", true);
+            });
+        }, 30000);
+        test("Get join requests", async () => {
             await runTest("Get join requests", async () => {
                 const response = await agent.get("/api/tniv/group/internal/join-requests")
                 expect(response.status).toBe(200);
             });
-    });
+        });
     });
 });
 
 describe("EIC Cleanup", () => {
     test("Mark case inactive", async () => {
         await runTest("Mark case inactive", async () => {
-            await agent.delete("/api/eic/case").query({username: "bacon", robloxId:8185869115, caseId:0, gameId:67, groupId: 1}).expect(200)
+            await agent.delete("/api/eic/case").query({ username: "bacon", robloxId: 8185869115, caseId: 0, gameId: 67, groupId: 1 }).expect(200)
         })
     })
     test("Cleanup test case", async () => {
@@ -235,21 +235,21 @@ describe("External Case Registries", () => {
             const RegistryCase = require(path.join(global.__basedir, 'utils/registry.js'));
             const caseInstance = new RegistryCase(null, "1478099365", true); // goggybo
             const cases = await caseInstance.getCases();
-            expect(cases.usernames).toBe("goggybo");
+            expect(cases[0].usernames).toBe("goggybo");
         });
     });
 });
 describe("ClanLabs", () => {
     test("Get blacklist for user", async () => {
         await runTest("Get blacklist for user", async () => {
-            const {getBlacklist} = require(path.join(global.__basedir, 'utils/clanLabs.js'));
+            const { getBlacklist } = require(path.join(global.__basedir, 'utils/clanLabs.js'));
             const result = await getBlacklist("User", "1478099365"); // goggybo
             expect(result.name).toBe("goggybo");
         });
     });
     test("Get blacklist for group", async () => {
         await runTest("Get blacklist for group", async () => {
-            const {getBlacklist} = require(path.join(global.__basedir, 'utils/clanLabs.js'));
+            const { getBlacklist } = require(path.join(global.__basedir, 'utils/clanLabs.js'));
             const result = await getBlacklist("Group", "35736046"); // Valax
             expect(result.name).toBe("Valax ’");
         });
@@ -259,23 +259,23 @@ describe("ClanLabs", () => {
 describe("Join Requests", () => {
     test("Process and deny request", async () => {
         await runTest("Process and deny request", async () => {
-            const {processUser} = require(path.join(global.__basedir, 'utils/group.js'));
+            const { processUser } = require(path.join(global.__basedir, 'utils/group.js'));
             //const result = await processUser(4114861546);  // valax guy
             const result = await processUser(1478099365); // goggybo 
             expect(result)
             expect(result.result).toBe(false);
-            
+
         });
-    },30000);
+    }, 30000);
     test("Process and accept request", async () => {
         await runTest("Process and accegetGroupBlacklistForUsergetGroupBlacklistForUserpt request", async () => {
-            const {processUser} = require(path.join(global.__basedir, 'utils/group.js'));
+            const { processUser } = require(path.join(global.__basedir, 'utils/group.js'));
             const result = await processUser(754278380); // me 
             expect(result)
             expect(result.result).toBe(true);
-            
+
         });
-    },30000);
+    }, 30000);
 });
 
 describe("Internal/webhooks", () => {

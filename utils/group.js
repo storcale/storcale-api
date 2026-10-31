@@ -394,7 +394,7 @@ async function processUser(id) {
         let username = userInfo.name;
         let accountAge = new Date(userInfo.createTime).getTime();
 
-        console.time("ProcessUser")
+        
         let currentTime = new Date().getTime();
         let ageInDays = (currentTime - accountAge) / (1000 * 60 * 60 * 24);
         
@@ -403,23 +403,23 @@ async function processUser(id) {
             pass +=1
         }
         data.push({"AccountAge": { result: ageInDays < 100, reason: ageInDays < 100 ? `Account is too new (${ageInDays} days)` : '', age:ageInDays, username }});
-        console.timeLog("ProcessUser","age")
+        
         // EIC
         const caseData = await Case.findOne({ robloxId: id, status: 'active' });
         if(caseData){
             pass +=1
         }
         data.push({"EIC":{result: caseData ? true : false, reason: caseData? `User has an active [${caseData.active}] case in ${caseData.weaponMechanic} ` : '',username}})
-        console.timeLog("ProcessUser","eic")
+        
         // registries
-        const registry = new RegistryCase(null, `${id}`, true); // ! Some cases like CW dont show up
+        const registry = new RegistryCase(null, `${id}`, true); 
         const cases = await registry.getCases();
-        console.log(cases)
-        if (cases && cases[0]) { // ! doesnt flag for some reason
+        const hit = cases.length >0;
+        if (hit) {
             pass += 1    
         }
-        data.push({"Registries":{ result: (cases && cases[0])=== true , reason: (cases && cases[0]) ?`User ${cases[0].usernames} has active cases in registries: ${cases.map(c => c.source).join(", ")}. \n Category: ${cases[0].category} | Type: ${cases[0].type} | Strike: ${cases[0].strike} \n Notes: ${cases[0].notes} EndDate: ${cases[0].end_date}`: '', username }});
-        console.timeLog("ProcessUser","registries")
+        data.push({"Registries":{ result: hit , reason: hit ? `User ${cases[0].usernames} has active cases in registries: ${cases.map(c => c.source).join(", ")}. \n Category: ${cases[0].category} | Type: ${cases[0].type} | Strike: ${cases[0].strike} \n Notes: ${cases[0].notes} EndDate: ${cases[0].end_date}`: '', username }});
+        
 
         // CL BLs
 
@@ -428,16 +428,14 @@ async function processUser(id) {
             pass +=1
         }
         data.push({"User Blacklist":{ result: blacklist ? true : false, reason: blacklist ? `User is blacklisted on ClanLabs: ${blacklist.name} (${blacklist.description})` : '', username }});
-        console.timeLog("ProcessUser","blacklist")
+        
         const groupBlacklists = await getGroupBlacklistsForUser(id);
         if (groupBlacklists) {
             pass +=1
         }
         data.push({"Group Blacklist":{ result: groupBlacklists ? true : false, reason: groupBlacklists ? `User is blacklisted in ClanLabs for being in ${groupBlacklists.length} group(s):  ${ groupBlacklists.map(groupBlacklist =>  groupBlacklist.name + ': ' + groupBlacklist.description + '\n')})` : '', username, groupBlacklists }});
-        console.timeLog("ProcessUser","group blacklist")
-        console.log(data)
-        console.timeEnd("ProcessUser")
-        // TODO rotector spidereye etc
+        
+        // TODO rotector spidereye tnic api etc
         return { result: pass === 0,  reason: pass ===0 ? "Passed all checks." : `Failed ${pass} checks.`, checks:data, username };
     } catch (err) {
         console.error('[processPending] Failed:', err?.response?.data || err.message);
