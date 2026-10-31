@@ -4,8 +4,58 @@ const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
 const RegistryCase = require(path.join(global.__basedir, 'utils/registry.js'));
 const { getBlacklist } = require(path.join(global.__basedir, 'utils/clanLabs.js'));
 const { getGroupBlacklistsForUser } = require(path.join(global.__basedir, 'utils/clanLabs.js'))
+const CHECK_LABELS = {
+    'AccountAge': 'Account Age',
+    'EIC': 'EIC Case',
+    'Registries': 'External Registries',
+    'User Blacklist': 'ClanLabs User Blacklist',
+    'Group Blacklist': 'ClanLabs Group Blacklist',
+};
+
+function truncate(str, max) {
+    str = String(str ?? '');
+    return str.length > max ? str.slice(0, max - 1) + '…' : str;
+}
+function flattenChecks(info) {
+    return (info?.checks || [])
+        .map((c) => {
+            const [name, detail] = Object.entries(c || {})[0] || [];
+            return { name, label: CHECK_LABELS[name] || name, failed: detail?.result === true, reason: detail?.reason || '' };
+        })
+        .filter((c) => c.name);
+}
+
+function formatAge(info) {
+    if (typeof info?.age !== 'number' || Number.isNaN(info.age)) return 'Unknown';
+    const days = Math.floor(info.age);
+    const created = info.createdAt ? ` (created <t:${info.createdAt}:D>)` : '';
+    return `${days} day${days === 1 ? '' : 's'}${created}`;
+}
+
+
+function buildInfoFields(info) {
+    if (!info) return [];
+    const fields = [{ name: 'Account Age', value: formatAge(info), inline: true }];
+    const checks = flattenChecks(info);
+    if (checks.length) {
+        fields.push({
+            name: 'Checks',
+            value: checks.map((c) => `${c.failed ? '❌' : '✅'} ${c.label}`).join('\n'),
+            inline: false,
+        });
+    }
+    return fields;
+}
+
+
+function buildFailedCheckFields(info) {
+    return flattenChecks(info)
+        .filter((c) => c.failed)
+        .map((c) => ({ name: `❌ ${c.label}`, value: c.reason || 'No details provided.', inline: false }));
+}
+
 // send webhook via api
-async function sendAcceptedWebhook(userId, groupId, username) {
+async function sendAcceptedWebhook(userId, groupId, username, info) {
     let target = process.env.pendingWebhookCode;
     if (process.env.NODE_ENV !== 'production') {
         target = process.env.OFFICE_CODE;
@@ -18,6 +68,7 @@ async function sendAcceptedWebhook(userId, groupId, username) {
         fields: [
             { name: 'User ID', value: String(userId), inline: true },
             { name: 'Group ID', value: String(groupId), inline: true },
+            ...buildInfoFields(info),
         ],
         footer: {
             text: `The Vanguard Development Team ` + process.env.NODE_ENV,
@@ -44,7 +95,7 @@ async function sendAcceptedWebhook(userId, groupId, username) {
 
     return response.data;
 }
-async function sendDeclinedWebhook(userId, groupId, reasonText, username) {
+async function sendDeclinedWebhook(userId, groupId, reasonText, username, info) {
     let target = process.env.pendingWebhookCode;
     if (process.env.NODE_ENV != 'production') {
         target = process.env.OFFICE_CODE;
@@ -57,7 +108,9 @@ async function sendDeclinedWebhook(userId, groupId, reasonText, username) {
         fields: [
             { name: 'User ID', value: String(userId), inline: true },
             { name: 'Group ID', value: String(groupId), inline: true },
-            { name: 'Reason', value: String(reasonText || "No reason specified (human requested)."), inline: false },
+            { name: 'Reason', value: reasonText || "No reason specified (human requested).", inline: false },
+            ...buildInfoFields(info),
+            ...buildFailedCheckFields(info),
         ],
         footer: {
             text: `The Vanguard Development Team ` + process.env.NODE_ENV,
@@ -84,46 +137,7 @@ async function sendDeclinedWebhook(userId, groupId, reasonText, username) {
 
     return response.data;
 }
-async function sendFailedJoinRequestWebhook(userId, groupId, reasonText, username) {
-    let target = process.env.pendingWebhookCode;
-    if (process.env.NODE_ENV != 'production') {
-        target = process.env.OFFICE_CODE;
-    }
 
-    const embed = {
-        title: "Join Request Declined",
-        description: `[${username || userId}](https://www.roblox.com/users/profile?userId=${userId}) has been declined from group [${groupId}](https://www.roblox.com/groups/${groupId}).`,
-        color: 0xff0000,
-        fields: [
-            { name: 'User ID', value: String(userId), inline: true },
-            { name: 'Group ID', value: String(groupId), inline: true },
-            { name: 'Reason', value: String(reasonText), inline: false },
-        ],
-        footer: {
-            text: `The Vanguard Development Team ` + process.env.NODE_ENV,
-        },
-        timestamp: new Date().toISOString(),
-    };
-
-    const payload = {
-        username: 'Storcale-API',
-        embeds: [embed],
-    };
-
-    const baseUrl = process.env.NODE_ENV === 'production'
-        ? 'https://storcale-api.omegadev.xyz'
-        : 'http://localhost:9902';
-    const url = `${baseUrl}/api/tniv/webhooks?target=${encodeURIComponent(target)}`;
-
-    const response = await axios.post(url, payload, {
-        headers: {
-            'Content-Type': 'application/json',
-            'api-key': process.env.ADMIN_KEY || '',
-        },
-    });
-
-    return response.data;
-}
 
 async function sendBanUpdateWebhook(userId, groupId, universeId, active, reason) {
     let target = process.env.NODE_ENV == 'production' ? process.env.ANTI_LOGS_CODE : process.env.OFFICE_CODE
@@ -318,14 +332,14 @@ class JoinRequest extends Group {
         }
     }
 
-    async accept(username) {
+    async accept(username, info) {
         try {
             const response = await axios.post(
                 `https://apis.roblox.com/cloud/v2/groups/${this.groupId}/join-requests/${this.userId}:accept`,
                 {},
                 { headers: { "x-api-key": process.env.ROBLOX_API_KEY } }
             );
-            sendAcceptedWebhook(this.userId, this.groupId, username)
+            sendAcceptedWebhook(this.userId, this.groupId, username, info)
                 .catch(e =>
                     console.error('[sendAcceptedWebhook] Failed:', e?.response?.data || e?.message)
 
@@ -339,14 +353,14 @@ class JoinRequest extends Group {
         }
     }
 
-    async decline(reasonText, username) {
+    async decline(reasonText, username, info) {
         try {
             const response = await axios.post(
                 `https://apis.roblox.com/cloud/v2/groups/${this.groupId}/join-requests/${this.userId}:decline`,
                 {},
                 { headers: { "x-api-key": process.env.ROBLOX_API_KEY } }
             );
-            sendDeclinedWebhook(this.userId, this.groupId, reasonText, username)
+            sendDeclinedWebhook(this.userId, this.groupId, reasonText, username, info)
                 .catch(e =>
                     console.error('[sendDeclinedWebhook] Failed:', e?.response?.data || e?.message)
                 );
@@ -372,10 +386,10 @@ class JoinRequest extends Group {
                 const result = await processUser(userId);
                 data.push(result);
                 if (result.result === true) {
-                    await this.accept(result.username);
+                    await this.accept(result.username, result);
                     text += result.username + ": Accepted\n";
                 } else {
-                    await this.decline(result.reason, result.username);
+                    await this.decline(result.reason, result.username, result);
                     text += result.username + ": Declined\n";
                 }
             } catch (err) {
@@ -402,7 +416,7 @@ async function processUser(id) {
         // Age 
         const tooNew = ageInDays < 100;
         if (tooNew) failed += 1;
-        data.push({ "AccountAge": { result: tooNew, reason: tooNew ? `Account is too new (${ageInDays} days)` : '', age: ageInDays, username } });
+        data.push({ "AccountAge": { result: tooNew, reason: tooNew ? `Account is too new (${Math.floor(ageInDays)} days old, minimum is 100)` : '', age: ageInDays, username } });
 
         // EIC
         const caseData = await Case.findOne({ robloxId: id, active: true });
@@ -418,7 +432,7 @@ async function processUser(id) {
         data.push({
             "Registries": {
                 result: hit,
-                reason: hit ? `User ${cases[0].usernames} has active cases in registries: ${cases.map(c => c.source).join(", ")}. \n Category: ${cases[0].category} | Type: ${cases[0].type} | Strike: ${cases[0].strike} \n Notes: ${cases[0].notes} EndDate: ${cases[0].end_date}` : '',
+                reason: hit ? cases.map(c => `**${c.source}**: ${c.usernames}\nCategory: ${c.category} | Type: ${c.type} | Strike: ${c.strike}\nNotes: ${c.notes}\nEnd date: ${c.end_date}`).join('\n\n') : '',
                 username
             }
         });
@@ -441,7 +455,7 @@ async function processUser(id) {
         });
 
         // TODO rotector spidereye tnic api etc
-        return { result: failed === 0, reason: failed === 0 ? "Passed all checks." : `Failed ${failed} checks.`, checks: data, username };
+        return { result: failed === 0, reason: failed === 0 ? "Passed all checks." : `Failed ${failed} check(s).`, checks: data, username, age: ageInDays, createdAt: Number.isFinite(accountAge) ? Math.floor(accountAge / 1000) : null };
     } catch (err) {
         console.error('[processPending] Failed:', err?.response?.data || err.message);
         throw err;
