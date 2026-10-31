@@ -114,6 +114,12 @@ router.get('/', async (req, res) => {
  *      - apiKey: []
  *     tags:
  *       - TNIV/Group/Internal
+ *     parameters:
+ *       - in: query
+ *         name: requestsToProcess
+ *         required: false
+ *         schema:
+ *           type: number
  *     responses:
  *       200:
  *         description: Successfully processed
@@ -122,10 +128,12 @@ router.get('/', async (req, res) => {
  */
 router.patch('/', async (req, res) => {
     try {
+        const parsed = parseInt(req.query?.requestsToProcess, 10);
+        const requestsToProcess = Number.isNaN(parsed) ? undefined : parsed;
         const joinRequest = new JoinRequest();
-        const text = await joinRequest.processPending();
+        const data = await joinRequest.processPending(requestsToProcess);
 
-        res.status(200).json({ message: '**Join requests processed successfully.**\n\n' + text });
+        res.status(200).json({ message: '**Join requests processed successfully.**\n\n' + data.text, data });
     } catch (err) {
         res.status(500).json({ error: 'Error processing join requests: ' + err.message });
     }

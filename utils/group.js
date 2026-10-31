@@ -2,8 +2,8 @@ const axios = require("axios");
 const path = require("path");
 const Case = require(path.join(global.__basedir, 'db/schemas/eic/case.js'));
 const RegistryCase = require(path.join(global.__basedir, 'utils/registry.js'));
-const {getBlacklist} = require(path.join(global.__basedir, 'utils/clanLabs.js'));
-const {getGroupBlacklistsForUser} = require(path.join(global.__basedir, 'utils/clanLabs.js'))
+const { getBlacklist } = require(path.join(global.__basedir, 'utils/clanLabs.js'));
+const { getGroupBlacklistsForUser } = require(path.join(global.__basedir, 'utils/clanLabs.js'))
 // send webhook via api
 async function sendAcceptedWebhook(userId, groupId, username) {
     let target = process.env.pendingWebhookCode;
@@ -275,7 +275,7 @@ class User {
             throw err;
         }
     }
-    async getGroups(){
+    async getGroups() {
         const url = `https://groups.roblox.com/v1/users/${this.userId}/groups/roles?includeLocked=false&includeNotificationPreferences=false`
         try {
             const response = await axios.get(url);
@@ -357,17 +357,20 @@ class JoinRequest extends Group {
             throw e;
         }
     }
-    async processPending() {
+    async processPending(n) {
         const pending = await this.getJoinRequests();
         let text = "";
+        const data = [];
         if (!pending || pending.length === 0) {
-            return "No pending join requests found.";
+            return { text: "No pending join requests found.", data };
         }
-        for (const request of pending) {
+        const limit = Number.isInteger(n) && n > 0 ? n : pending.length;
+        for (const request of pending.slice(0, limit)) {
             const userId = request.user.split("/").slice(1).join("/");
             this.userId = userId;
             try {
                 const result = await processUser(userId);
+                data.push(result);
                 if (result.result === true) {
                     await this.accept(result.username);
                     text += result.username + ": Accepted\n";
@@ -381,68 +384,70 @@ class JoinRequest extends Group {
                 text += `${userId}: Error (${err.message})\n`;
             }
         }
-        return text;
+        return { text, data };
     }
+
 }
 
 async function processUser(id) {
     try {
-        let data = []
-        let pass = 0
-        let user = new User(id);
-        let userInfo = await user.getInfo();
-        let username = userInfo.name;
-        let accountAge = new Date(userInfo.createTime).getTime();
+        const data = [];
+        let failed = 0;
+        const user = new User(id);
+        const userInfo = await user.getInfo();
+        const username = userInfo.name;
+        const accountAge = new Date(userInfo.createTime).getTime();
 
-        
-        let currentTime = new Date().getTime();
-        let ageInDays = (currentTime - accountAge) / (1000 * 60 * 60 * 24);
-        
-        // Age check
-        if(ageInDays < 100){
-            pass +=1
-        }
-        data.push({"AccountAge": { result: ageInDays < 100, reason: ageInDays < 100 ? `Account is too new (${ageInDays} days)` : '', age:ageInDays, username }});
-        
+        const ageInDays = (Date.now() - accountAge) / (1000 * 60 * 60 * 24);
+        // Age 
+        const tooNew = ageInDays < 100;
+        if (tooNew) failed += 1;
+        data.push({ "AccountAge": { result: tooNew, reason: tooNew ? `Account is too new (${ageInDays} days)` : '', age: ageInDays, username } });
+
         // EIC
-        const caseData = await Case.findOne({ robloxId: id, status: 'active' });
-        if(caseData){
-            pass +=1
-        }
-        data.push({"EIC":{result: caseData ? true : false, reason: caseData? `User has an active [${caseData.active}] case in ${caseData.weaponMechanic} ` : '',username}})
-        
-        // registries
-        const registry = new RegistryCase(null, `${id}`, true); 
-        const cases = await registry.getCases();
-        const hit = cases.length >0;
-        if (hit) {
-            pass += 1    
-        }
-        data.push({"Registries":{ result: hit , reason: hit ? `User ${cases[0].usernames} has active cases in registries: ${cases.map(c => c.source).join(", ")}. \n Category: ${cases[0].category} | Type: ${cases[0].type} | Strike: ${cases[0].strike} \n Notes: ${cases[0].notes} EndDate: ${cases[0].end_date}`: '', username }});
-        
+        const caseData = await Case.findOne({ robloxId: id, active: true });
+        if (caseData) failed += 1;
+        data.push({ "EIC": { result: !!caseData, reason: caseData ? `User has an active case in ${caseData.weaponMechanic}` : '', username } });
 
-        // CL BLs
+        // Registries
+        const registry = new RegistryCase(null, `${id}`, true);
+        const found = await registry.getCases();
+        const cases = Array.isArray(found) ? found : (found ? [found] : []);
+        const hit = cases.length > 0;
+        if (hit) failed += 1;
+        data.push({
+            "Registries": {
+                result: hit,
+                reason: hit ? `User ${cases[0].usernames} has active cases in registries: ${cases.map(c => c.source).join(", ")}. \n Category: ${cases[0].category} | Type: ${cases[0].type} | Strike: ${cases[0].strike} \n Notes: ${cases[0].notes} EndDate: ${cases[0].end_date}` : '',
+                username
+            }
+        });
 
+        // ClanLabs user blacklist
         const blacklist = await getBlacklist("User", id);
-        if (blacklist) {
-            pass +=1
-        }
-        data.push({"User Blacklist":{ result: blacklist ? true : false, reason: blacklist ? `User is blacklisted on ClanLabs: ${blacklist.name} (${blacklist.description})` : '', username }});
-        
+        if (blacklist) failed += 1;
+        data.push({ "User Blacklist": { result: !!blacklist, reason: blacklist ? `User is blacklisted on ClanLabs: ${blacklist.name} (${blacklist.description})` : '', username } });
+
         const groupBlacklists = await getGroupBlacklistsForUser(id);
-        if (groupBlacklists) {
-            pass +=1
-        }
-        data.push({"Group Blacklist":{ result: groupBlacklists ? true : false, reason: groupBlacklists ? `User is blacklisted in ClanLabs for being in ${groupBlacklists.length} group(s):  ${ groupBlacklists.map(groupBlacklist =>  groupBlacklist.name + ': ' + groupBlacklist.description + '\n')})` : '', username, groupBlacklists }});
-        
+        const inBlacklistedGroup = Array.isArray(groupBlacklists) && groupBlacklists.length > 0;
+        if (inBlacklistedGroup) failed += 1;
+        data.push({
+            "Group Blacklist": {
+                result: inBlacklistedGroup,
+                reason: inBlacklistedGroup ? `User is blacklisted in ClanLabs for being in ${groupBlacklists.length} group(s): ${groupBlacklists.map(g => g.name + ': ' + g.description).join('\n')}` : '',
+                username,
+                groupBlacklists
+            }
+        });
+
         // TODO rotector spidereye tnic api etc
-        return { result: pass === 0,  reason: pass ===0 ? "Passed all checks." : `Failed ${pass} checks.`, checks:data, username };
+        return { result: failed === 0, reason: failed === 0 ? "Passed all checks." : `Failed ${failed} checks.`, checks: data, username };
     } catch (err) {
         console.error('[processPending] Failed:', err?.response?.data || err.message);
-        throw err
-        //return { error: 'Error processing pending request ' + err.message, username };
+        throw err;
     }
 }
+
 module.exports = {
     Group,
     JoinRequest,
