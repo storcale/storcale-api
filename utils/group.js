@@ -13,7 +13,7 @@ async function sendAcceptedWebhook(userId, groupId, username) {
 
     const embed = {
         title: "Join Request Accepted",
-        description: `[${username}](https://www.roblox.com/users/profile?userId=${userId}) has been accepted into group [${groupId}](https://www.roblox.com/groups/${groupId}).`,
+        description: `[${username}](https://www.roblox.com/users/${userId}/profile) has been accepted into group [${groupId}](https://www.roblox.com/groups/${groupId}).`,
         color: 0x00ff00,
         fields: [
             { name: 'User ID', value: String(userId), inline: true },
@@ -52,7 +52,7 @@ async function sendDeclinedWebhook(userId, groupId, reasonText, username) {
 
     const embed = {
         title: "Join Request Declined",
-        description: `[${username || userId}](https://www.roblox.com/users/profile?userId=${userId}) has been declined from group [${groupId}](https://www.roblox.com/groups/${groupId}).`,
+        description: `[${username || userId}](https://www.roblox.com/users/${userId}/profile) has been declined from group [${groupId}](https://www.roblox.com/groups/${groupId}).`,
         color: 0xff0000,
         fields: [
             { name: 'User ID', value: String(userId), inline: true },
@@ -92,7 +92,7 @@ async function sendFailedJoinRequestWebhook(userId, groupId, reasonText, usernam
 
     const embed = {
         title: "Join Request Declined",
-        description: `[${username || userId}](https://www.roblox.com/users/profile?userId=${userId}) has been declined from group [${groupId}](https://www.roblox.com/groups/${groupId}).`,
+        description: `[${username || userId}](https://www.roblox.com/users/${userId}/profile) has been declined from group [${groupId}](https://www.roblox.com/groups/${groupId}).`,
         color: 0xff0000,
         fields: [
             { name: 'User ID', value: String(userId), inline: true },
@@ -129,7 +129,7 @@ async function sendBanUpdateWebhook(userId, groupId, universeId, active, reason)
     let target = process.env.NODE_ENV == 'production' ? process.env.ANTI_LOGS_CODE : process.env.OFFICE_CODE
     const embed = {
         title: "Ban updated",
-        description: `[${userId}](https://www.roblox.com/users/profile?userId=${userId}) has had his ban updated in game [${universeId}](https://www.roblox.com/games/${universeId}) to ${active}.`,
+        description: `[${userId}](https://www.roblox.com/users/${userId}/profile) has had his ban updated in game [${universeId}](https://www.roblox.com/games/${universeId}) to ${active}.`,
         color: active ? 0xff0000 : 0x00ff00,
         fields: [
             { name: 'User ID', value: String(userId), inline: true },
