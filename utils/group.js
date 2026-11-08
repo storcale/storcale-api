@@ -409,6 +409,7 @@ async function processUser(id) {
         let failed = 0;
         const user = new User(id);
         const userInfo = await user.getInfo();
+        const groups = await user.getGroups()
         const username = userInfo.name;
         const accountAge = new Date(userInfo.createTime).getTime();
 
@@ -442,7 +443,7 @@ async function processUser(id) {
         if (blacklist) failed += 1;
         data.push({ "User Blacklist": { result: !!blacklist, reason: blacklist ? `User is blacklisted on ClanLabs: ${blacklist.name} (${blacklist.description})` : '', username } });
 
-        const groupBlacklists = await getGroupBlacklistsForUser(id);
+        const groupBlacklists = await getGroupBlacklistsForUser(id,groups);
         const inBlacklistedGroup = Array.isArray(groupBlacklists) && groupBlacklists.length > 0;
         if (inBlacklistedGroup) failed += 1;
         data.push({
@@ -454,6 +455,17 @@ async function processUser(id) {
             }
         });
 
+        // Check if in  TNI
+        const inTni = groups.includes(1174414) 
+        if(!inTni) failed+=1
+        data.push({
+            "TNI check": {
+                result: !inTni,
+                reason: !inTni ? `User is not in TNI` : '',
+                username
+            }
+        });
+        console.log(data)
         // TODO rotector spidereye tnic api etc
         return { result: failed === 0, reason: failed === 0 ? "Passed all checks." : `Failed ${failed} check(s).`, checks: data, username, age: ageInDays, createdAt: Number.isFinite(accountAge) ? Math.floor(accountAge / 1000) : null };
     } catch (err) {
