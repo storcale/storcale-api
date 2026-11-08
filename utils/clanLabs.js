@@ -23,12 +23,12 @@ async function getBlacklist(type, id) {
     return response.data?.data ?? false;
 }
 
-async function getGroupBlacklistsForUser(id) {
+async function getGroupBlacklistsForUser(id,groupList) {
     try {
         const { User } = require(path.join(global.__basedir, 'utils/group.js'));
         const user = new User(id)
 
-        const groups = await user.getGroups()
+        const groups = groupList || await user.getGroups()
         const blacklists = []
         for (const groupId of groups) {
             let blacklist = await getBlacklist("Group", groupId)
