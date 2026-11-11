@@ -63,7 +63,7 @@ async function sendAcceptedWebhook(userId, groupId, username, info) {
 
     const embed = {
         title: "Join Request Accepted",
-        description: `[${username}](https://www.roblox.com/users/profile?userId=${userId}) has been accepted into group [${groupId}](https://www.roblox.com/groups/${groupId}).`,
+        description: `[${username}](https://www.roblox.com/users/{userId}/profile) has been accepted into group [${groupId}](https://www.roblox.com/groups/${groupId}).`,
         color: 0x00ff00,
         fields: [
             { name: 'User ID', value: String(userId), inline: true },
